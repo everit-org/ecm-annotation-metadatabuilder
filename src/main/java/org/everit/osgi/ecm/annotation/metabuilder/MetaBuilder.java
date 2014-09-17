@@ -2,13 +2,16 @@ package org.everit.osgi.ecm.annotation.metabuilder;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.everit.osgi.ecm.annotation.AutoDetect;
@@ -17,21 +20,37 @@ import org.everit.osgi.ecm.annotation.Reference;
 import org.everit.osgi.ecm.annotation.References;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttribute;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttributes;
+import org.everit.osgi.ecm.annotation.attribute.ByteAttribute;
 import org.everit.osgi.ecm.annotation.attribute.ByteAttributes;
+import org.everit.osgi.ecm.annotation.attribute.CharacterAttribute;
 import org.everit.osgi.ecm.annotation.attribute.CharacterAttributes;
+import org.everit.osgi.ecm.annotation.attribute.DoubleAttribute;
 import org.everit.osgi.ecm.annotation.attribute.DoubleAttributes;
+import org.everit.osgi.ecm.annotation.attribute.FloatAttribute;
 import org.everit.osgi.ecm.annotation.attribute.FloatAttributes;
+import org.everit.osgi.ecm.annotation.attribute.IntegerAttribute;
 import org.everit.osgi.ecm.annotation.attribute.IntegerAttributes;
+import org.everit.osgi.ecm.annotation.attribute.LongAttribute;
 import org.everit.osgi.ecm.annotation.attribute.LongAttributes;
+import org.everit.osgi.ecm.annotation.attribute.PasswordAttribute;
 import org.everit.osgi.ecm.annotation.attribute.PasswordAttributes;
 import org.everit.osgi.ecm.annotation.attribute.ReferenceAttribute;
+import org.everit.osgi.ecm.annotation.attribute.ShortAttribute;
 import org.everit.osgi.ecm.annotation.attribute.ShortAttributes;
+import org.everit.osgi.ecm.annotation.attribute.StringAttribute;
 import org.everit.osgi.ecm.annotation.attribute.StringAttributes;
 import org.everit.osgi.ecm.meta.AttributeMeta.AttributeMetaBuilder;
 import org.everit.osgi.ecm.meta.AttributeMetaHolder;
 import org.everit.osgi.ecm.meta.BooleanAttributeMeta.BooleanAttributeMetaBuilder;
+import org.everit.osgi.ecm.meta.ByteAttributeMeta.ByteAttributeMetaBuilder;
+import org.everit.osgi.ecm.meta.CharacterAttributeMeta.CharacterAttributeMetaBuilder;
 import org.everit.osgi.ecm.meta.ComponentMeta;
 import org.everit.osgi.ecm.meta.ComponentMeta.ComponentMetaBuilder;
+import org.everit.osgi.ecm.meta.DoubleAttributeMeta.DoubleAttributeMetaBuilder;
+import org.everit.osgi.ecm.meta.FloatAttributeMeta.FloatAttributeMetaBuilder;
+import org.everit.osgi.ecm.meta.IntegerAttributeMeta.IntegerAttributeMetaBuilder;
+import org.everit.osgi.ecm.meta.LongAttributeMeta.LongAttributeMetaBuilder;
+import org.everit.osgi.ecm.meta.PasswordAttributeMeta.PasswordAttributeMetaBuilder;
 import org.everit.osgi.ecm.meta.PropertyAttributeMeta.PropertyAttributeMetaBuilder;
 import org.everit.osgi.ecm.meta.ReferenceAttributeMeta;
 import org.everit.osgi.ecm.meta.ReferenceAttributeMeta.ReferenceAttributeMetaBuilder;
@@ -39,6 +58,9 @@ import org.everit.osgi.ecm.meta.ReferenceCardinality;
 import org.everit.osgi.ecm.meta.ReferenceConfigurationType;
 import org.everit.osgi.ecm.meta.ReferenceMeta;
 import org.everit.osgi.ecm.meta.ReferenceMeta.ReferenceMetaBuilder;
+import org.everit.osgi.ecm.meta.SelectablePropertyAttributeMeta.SelectablePropertyAttributeMetaBuilder;
+import org.everit.osgi.ecm.meta.ShortAttributeMeta.ShortAttributeMetaBuilder;
+import org.everit.osgi.ecm.meta.StringAttributeMeta.StringAttributeMetaBuilder;
 import org.osgi.framework.BundleContext;
 
 public class MetaBuilder<C> {
@@ -63,6 +85,21 @@ public class MetaBuilder<C> {
     public static <C> ComponentMeta<C> buildComponentMeta(BundleContext bundleContext, Class<C> clazz) {
         MetaBuilder<C> metaBuilder = new MetaBuilder<C>(clazz, bundleContext);
         return metaBuilder.build();
+    }
+
+    private static <O> O[] convertPrimitiveArray(Object primitiveArray, Class<O> targetType) {
+        int length = Array.getLength(primitiveArray);
+
+        @SuppressWarnings("unchecked")
+        O[] result = (O[]) Array.newInstance(targetType, length);
+
+        for (int i = 0; i < length; i++) {
+            @SuppressWarnings("unchecked")
+            O element = (O) Array.get(primitiveArray, i);
+            result[i] = element;
+        }
+
+        return result;
     }
 
     private final List<AttributeMetaHolder<?>> attributes = new ArrayList<AttributeMetaHolder<?>>();
@@ -94,6 +131,7 @@ public class MetaBuilder<C> {
                 .withDescription(makeStringNullIfEmpty(componentAnnotation.description()))
                 .withIcon(makeStringNullIfEmpty(componentAnnotation.icon()))
                 .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
+                .withLocalization(makeStringNullIfEmpty(componentAnnotation.localization()))
                 .withType(clazz);
 
         generateMetaForAttributeHolders();
@@ -175,23 +213,37 @@ public class MetaBuilder<C> {
 
     private <V, B extends AttributeMetaBuilder<V, B>> void fillAttributeMetaBuilder(
             Member member,
-            BooleanAttribute annotation,
+            Annotation annotation,
             AttributeMetaBuilder<V, B> builder) {
 
         String name = callMethodOfAnnotation(annotation, "name");
         name = makeStringNullIfEmpty(name);
+        String memberName = member.getName();
         if (name == null && member != null) {
             if (member instanceof Field) {
-
+                name = memberName;
+            } else if (member instanceof Method && memberName.startsWith("set") && memberName.length() > 3) {
+                name = memberName.substring(3, 4).toLowerCase() + memberName.substring(4);
             }
         }
 
-        // TODO
+        Boolean metatype = callMethodOfAnnotation(annotation, "metatype");
+        String label = callMethodOfAnnotation(annotation, "label");
+        String description = callMethodOfAnnotation(annotation, "description");
+
+        Object defaultValueArray = callMethodOfAnnotation(annotation, "defaultValue");
+        V[] convertedDefaultValues = convertPrimitiveArray(defaultValueArray, builder.getValueType());
+
+        builder.withName(name)
+                .withMetatype(metatype)
+                .withLabel(makeStringNullIfEmpty(label))
+                .withDescription(makeStringNullIfEmpty(description))
+                .withDefaultValue(convertedDefaultValues);
     }
 
     private <V, B extends PropertyAttributeMetaBuilder<V, B>> void fillPropertyAttributeBuilder(
             Member member,
-            BooleanAttribute annotation,
+            Annotation annotation,
             PropertyAttributeMetaBuilder<V, B> builder) {
 
         String setter = callMethodOfAnnotation(annotation, "setter");
@@ -219,6 +271,36 @@ public class MetaBuilder<C> {
         builder.withCardinality(cardinality);
 
         fillAttributeMetaBuilder(member, annotation, builder);
+
+    }
+
+    private <V, B extends SelectablePropertyAttributeMetaBuilder<V, B>> void fillSelectablePropertyAttributeBuilder(
+            Member member, Annotation annotation,
+            SelectablePropertyAttributeMetaBuilder<V, B> builder) {
+        fillPropertyAttributeBuilder(member, annotation, builder);
+
+        Object optionAnnotationArray = callMethodOfAnnotation(annotation, "options");
+        int length = Array.getLength(optionAnnotationArray);
+        if (length == 0) {
+            builder.withOptions(null);
+            return;
+        }
+
+        Map<V, String> options = new LinkedHashMap<V, String>();
+        for (int i = 0; i < length; i++) {
+            Annotation optionAnnotation = (Annotation) Array.get(optionAnnotationArray, i);
+
+            String label = callMethodOfAnnotation(optionAnnotation, "label");
+            V value = callMethodOfAnnotation(optionAnnotation, "value");
+
+            label = makeStringNullIfEmpty(label);
+            if (label == null) {
+                label = value.toString();
+            }
+
+            options.put(value, label);
+        }
+        builder.withOptions(options);
     }
 
     private void generateAttributeMetaForAnnotatedElements(AnnotatedElement[] annotatedElements) {
@@ -268,23 +350,83 @@ public class MetaBuilder<C> {
 
     private void processAttributeHolderAnnotation(Member element, Annotation annotation) {
         Class<? extends Annotation> annotationType = annotation.annotationType();
+
         if (ANNOTATION_CONTAINER_TYPES.contains(annotationType)) {
             processAnnotationContainer(annotation);
         } else if (annotationType.equals(Reference.class)) {
             processReferenceAnnotation(element, (Reference) annotation);
         } else if (annotationType.equals(BooleanAttribute.class)) {
-            processBooleanAttributeAnnotation(element, (BooleanAttribute) annotation);
+            processBooleanAttributeAnnotation(element, annotation);
+        } else if (annotationType.equals(ByteAttribute.class)) {
+            processByteAttributeAnnotation(element, annotation);
+        } else if (annotationType.equals(CharacterAttribute.class)) {
+            processCharacterAttributeAnnotation(element, annotation);
+        } else if (annotationType.equals(DoubleAttribute.class)) {
+            processDoubleAttributeAnnotation(element, annotation);
+        } else if (annotationType.equals(FloatAttribute.class)) {
+            processFloatAttributeAnnotation(element, annotation);
+        } else if (annotationType.equals(IntegerAttribute.class)) {
+            processIntegerAttributeAnnotation(element, annotation);
+        } else if (annotationType.equals(LongAttribute.class)) {
+            processLongAttributeAnnotation(element, annotation);
+        } else if (annotationType.equals(PasswordAttribute.class)) {
+            processPasswordAttributeAnnotation(element, annotation);
+        } else if (annotationType.equals(ShortAttribute.class)) {
+            processShortAttributeAnnotation(element, annotation);
+        } else if (annotationType.equals(StringAttribute.class)) {
+            processStringAttributeAnnotation(element, annotation);
         }
-        // TODO process other annotation types
     }
 
-    private void processBooleanAttributeAnnotation(Member element, BooleanAttribute annotation) {
+    private void processBooleanAttributeAnnotation(Member element, Annotation annotation) {
         BooleanAttributeMetaBuilder builder = new BooleanAttributeMetaBuilder();
         fillPropertyAttributeBuilder(element, annotation, builder);
         attributes.add(builder.build());
     }
 
-    private void processReferenceAnnotation(Member element, Reference annotation) {
+    private void processByteAttributeAnnotation(Member element, Annotation annotation) {
+        ByteAttributeMetaBuilder builder = new ByteAttributeMetaBuilder();
+        fillSelectablePropertyAttributeBuilder(element, annotation, builder);
+        attributes.add(builder.build());
+    }
+
+    private void processCharacterAttributeAnnotation(Member element, Annotation annotation) {
+        CharacterAttributeMetaBuilder builder = new CharacterAttributeMetaBuilder();
+        fillSelectablePropertyAttributeBuilder(element, annotation, builder);
+        attributes.add(builder.build());
+    }
+
+    private void processDoubleAttributeAnnotation(Member element, Annotation annotation) {
+        DoubleAttributeMetaBuilder builder = new DoubleAttributeMetaBuilder();
+        fillSelectablePropertyAttributeBuilder(element, annotation, builder);
+        attributes.add(builder.build());
+    }
+
+    private void processFloatAttributeAnnotation(Member element, Annotation annotation) {
+        FloatAttributeMetaBuilder builder = new FloatAttributeMetaBuilder();
+        fillSelectablePropertyAttributeBuilder(element, annotation, builder);
+        attributes.add(builder.build());
+    }
+
+    private void processIntegerAttributeAnnotation(Member element, Annotation annotation) {
+        IntegerAttributeMetaBuilder builder = new IntegerAttributeMetaBuilder();
+        fillSelectablePropertyAttributeBuilder(element, annotation, builder);
+        attributes.add(builder.build());
+    }
+
+    private void processLongAttributeAnnotation(Member element, Annotation annotation) {
+        LongAttributeMetaBuilder builder = new LongAttributeMetaBuilder();
+        fillSelectablePropertyAttributeBuilder(element, annotation, builder);
+        attributes.add(builder.build());
+    }
+
+    private void processPasswordAttributeAnnotation(Member element, Annotation annotation) {
+        PasswordAttributeMetaBuilder builder = new PasswordAttributeMetaBuilder();
+        fillPropertyAttributeBuilder(element, annotation, builder);
+        attributes.add(builder.build());
+    }
+
+    private void processReferenceAnnotation(Member member, Reference annotation) {
         ReferenceAttribute attribute = annotation.attribute();
         ReferenceAttributeMeta referenceAttribute = new ReferenceAttributeMetaBuilder()
                 .withDefaultValue(attribute.defaultValue())
@@ -296,8 +438,8 @@ public class MetaBuilder<C> {
                 .build();
 
         ReferenceMeta referenceMeta = new ReferenceMetaBuilder()
-                .withName(deriveName(element, annotation))
-                .withReferenceInterface(deriveReferenceInterface(element, annotation))
+                .withName(deriveName(member, annotation))
+                .withReferenceInterface(deriveReferenceInterface(member, annotation))
                 .withBind(makeStringNullIfEmpty(annotation.bind()))
                 .withCardinality(convertAnnotationReferenceCardinality(annotation.cardinality()))
                 .withDynamic(annotation.dynamic())
@@ -305,5 +447,19 @@ public class MetaBuilder<C> {
                 .withAttribute(referenceAttribute).build();
 
         attributes.add(referenceMeta);
+    }
+
+    private void processShortAttributeAnnotation(Member element, Annotation annotation) {
+        ShortAttributeMetaBuilder builder = new ShortAttributeMetaBuilder();
+        fillSelectablePropertyAttributeBuilder(element, annotation, builder);
+        attributes.add(builder.build());
+    }
+
+    private void processStringAttributeAnnotation(Member element, Annotation annotation) {
+        StringAttributeMetaBuilder builder = new StringAttributeMetaBuilder();
+        fillSelectablePropertyAttributeBuilder(element, annotation, builder);
+        Boolean multiLine = callMethodOfAnnotation(annotation, "multiLine");
+        builder.withMultiLine(multiLine);
+        attributes.add(builder.build());
     }
 }
