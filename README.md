@@ -1,4 +1,5 @@
-ecm-annotation-metabuilder
-==========================
+ecm-annotation-metadatabuilder
+==============================
 
-Helper library of Everit Component Model to transform annotations into Meta classes.
+Helper library of Everit Component Model to transform annotations into
+Metadata classes.
