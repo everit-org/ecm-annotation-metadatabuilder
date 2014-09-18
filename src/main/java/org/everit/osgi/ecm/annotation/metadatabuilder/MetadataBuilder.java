@@ -64,6 +64,7 @@ import org.everit.osgi.ecm.metadata.ComponentMetadata;
 import org.everit.osgi.ecm.metadata.ComponentMetadata.ComponentMetadataBuilder;
 import org.everit.osgi.ecm.metadata.DoubleAttributeMetadata.DoubleAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.FloatAttributeMetadata.FloatAttributeMetadataBuilder;
+import org.everit.osgi.ecm.metadata.Icon;
 import org.everit.osgi.ecm.metadata.IntegerAttributeMetadata.IntegerAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.LongAttributeMetadata.LongAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.PasswordAttributeMetadata.PasswordAttributeMetadataBuilder;
@@ -140,9 +141,10 @@ public class MetadataBuilder<C> {
                 .withConfigurationPid(makeStringNullIfEmpty(componentAnnotation.configurationPid()))
                 .withConfigurationRequired(componentAnnotation.configurationRequired())
                 .withDescription(makeStringNullIfEmpty(componentAnnotation.description()))
-                .withIcon(makeStringNullIfEmpty(componentAnnotation.icon()))
+                .withIcons(convertIcons(componentAnnotation.icons()))
+                .withMetatype(componentAnnotation.metatype())
                 .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
-                .withLocalization(makeStringNullIfEmpty(componentAnnotation.localization()))
+                .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()))
                 .withType(clazz);
 
         generateMetaForAttributeHolders();
@@ -183,6 +185,17 @@ public class MetadataBuilder<C> {
             return ReferenceCardinality.MANDATORY;
         }
         return null;
+    }
+
+    private Icon[] convertIcons(org.everit.osgi.ecm.annotation.Icon[] icons) {
+        if (icons == null) {
+            return null;
+        }
+        Icon[] result = new Icon[icons.length];
+        for (int i = 0; i < icons.length; i++) {
+            result[i] = new Icon(icons[i].path(), icons[i].size());
+        }
+        return result;
     }
 
     private ReferenceConfigurationType convertReferenceAttributeType(
