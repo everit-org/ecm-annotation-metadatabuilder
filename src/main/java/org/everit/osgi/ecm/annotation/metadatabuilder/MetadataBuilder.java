@@ -50,13 +50,12 @@ import org.everit.osgi.ecm.annotation.attribute.LongAttribute;
 import org.everit.osgi.ecm.annotation.attribute.LongAttributes;
 import org.everit.osgi.ecm.annotation.attribute.PasswordAttribute;
 import org.everit.osgi.ecm.annotation.attribute.PasswordAttributes;
-import org.everit.osgi.ecm.annotation.attribute.ReferenceAttribute;
 import org.everit.osgi.ecm.annotation.attribute.ShortAttribute;
 import org.everit.osgi.ecm.annotation.attribute.ShortAttributes;
 import org.everit.osgi.ecm.annotation.attribute.StringAttribute;
 import org.everit.osgi.ecm.annotation.attribute.StringAttributes;
+import org.everit.osgi.ecm.metadata.AttributeMetadata;
 import org.everit.osgi.ecm.metadata.AttributeMetadata.AttributeMetadataBuilder;
-import org.everit.osgi.ecm.metadata.AttributeMetadataHolder;
 import org.everit.osgi.ecm.metadata.BooleanAttributeMetadata.BooleanAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ByteAttributeMetadata.ByteAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.CharacterAttributeMetadata.CharacterAttributeMetadataBuilder;
@@ -69,9 +68,6 @@ import org.everit.osgi.ecm.metadata.IntegerAttributeMetadata.IntegerAttributeMet
 import org.everit.osgi.ecm.metadata.LongAttributeMetadata.LongAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.PasswordAttributeMetadata.PasswordAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.PropertyAttributeMetadata.PropertyAttributeMetadataBuilder;
-import org.everit.osgi.ecm.metadata.ReferenceAttributeMetadata;
-import org.everit.osgi.ecm.metadata.ReferenceAttributeMetadata.ReferenceAttributeMetadataBuilder;
-import org.everit.osgi.ecm.metadata.ReferenceCardinality;
 import org.everit.osgi.ecm.metadata.ReferenceConfigurationType;
 import org.everit.osgi.ecm.metadata.ReferenceMetadata;
 import org.everit.osgi.ecm.metadata.ReferenceMetadata.ReferenceMetadataBuilder;
@@ -80,6 +76,8 @@ import org.everit.osgi.ecm.metadata.ShortAttributeMetadata.ShortAttributeMetadat
 import org.everit.osgi.ecm.metadata.StringAttributeMetadata.StringAttributeMetadataBuilder;
 
 public class MetadataBuilder<C> {
+
+    // TODO activate, inactivate and modified methods
 
     private static final Set<Class<?>> ANNOTATION_CONTAINER_TYPES;
 
@@ -118,7 +116,7 @@ public class MetadataBuilder<C> {
         return result;
     }
 
-    private final List<AttributeMetadataHolder<?>> attributes = new ArrayList<AttributeMetadataHolder<?>>();
+    private final List<AttributeMetadata<?>> attributes = new ArrayList<AttributeMetadata<?>>();
 
     private Class<C> clazz;
 
@@ -137,7 +135,7 @@ public class MetadataBuilder<C> {
 
         ComponentMetadataBuilder<C> componentMetaBuilder = new ComponentMetadataBuilder<C>()
                 .withConfigurationFactory(componentAnnotation.configurationFactory())
-                .withName(makeStringNullIfEmpty(componentAnnotation.name()))
+                .withComponentId(makeStringNullIfEmpty(componentAnnotation.componentId()))
                 .withConfigurationPid(makeStringNullIfEmpty(componentAnnotation.configurationPid()))
                 .withConfigurationRequired(componentAnnotation.configurationRequired())
                 .withDescription(makeStringNullIfEmpty(componentAnnotation.description()))
@@ -149,7 +147,7 @@ public class MetadataBuilder<C> {
 
         generateMetaForAttributeHolders();
 
-        componentMetaBuilder.withAttributeHolders(attributes.toArray(new AttributeMetadataHolder<?>[0]));
+        componentMetaBuilder.withAttributes(attributes.toArray(new AttributeMetadata<?>[0]));
 
         return componentMetaBuilder.build();
     }
@@ -171,22 +169,6 @@ public class MetadataBuilder<C> {
 
     }
 
-    private ReferenceCardinality convertAnnotationReferenceCardinality(
-            org.everit.osgi.ecm.annotation.ReferenceCardinality annotationCardinality) {
-
-        switch (annotationCardinality) {
-        case AT_LEAST_ONE:
-            return ReferenceCardinality.AT_LEAST_ONE;
-        case OPTIONAL:
-            return ReferenceCardinality.OPTIONAL;
-        case MULTIPLE:
-            return ReferenceCardinality.MULTIPLE;
-        case MANDATORY:
-            return ReferenceCardinality.MANDATORY;
-        }
-        return null;
-    }
-
     private Icon[] convertIcons(org.everit.osgi.ecm.annotation.Icon[] icons) {
         if (icons == null) {
             return null;
@@ -198,18 +180,18 @@ public class MetadataBuilder<C> {
         return result;
     }
 
-    private ReferenceConfigurationType convertReferenceAttributeType(
-            org.everit.osgi.ecm.annotation.attribute.ReferenceConfigurationType attributeType) {
+    private ReferenceConfigurationType convertReferenceConfigurationType(
+            org.everit.osgi.ecm.annotation.ReferenceConfigurationType attributeType) {
 
-        if (attributeType.equals(org.everit.osgi.ecm.annotation.attribute.ReferenceConfigurationType.CLAUSE)) {
+        if (attributeType.equals(org.everit.osgi.ecm.annotation.ReferenceConfigurationType.CLAUSE)) {
             return ReferenceConfigurationType.CLAUSE;
         } else {
             return ReferenceConfigurationType.FILTER;
         }
     }
 
-    private String deriveName(Member member, Annotation annotation) {
-        String name = callMethodOfAnnotation(annotation, "name");
+    private String deriveReferenceId(Member member, Annotation annotation) {
+        String name = callMethodOfAnnotation(annotation, "referenceId");
         name = makeStringNullIfEmpty(name);
         if (name != null) {
             return name;
@@ -240,17 +222,9 @@ public class MetadataBuilder<C> {
             Annotation annotation,
             AttributeMetadataBuilder<V, B> builder) {
 
-        String name = callMethodOfAnnotation(annotation, "name");
-        name = makeStringNullIfEmpty(name);
-        String memberName = member.getName();
-        if (name == null && member != null) {
-            if (member instanceof Field) {
-                name = memberName;
-            } else if (member instanceof Method && memberName.startsWith("set") && memberName.length() > 3) {
-                name = memberName.substring(3, 4).toLowerCase() + memberName.substring(4);
-            }
-        }
-
+        Boolean dynamic = callMethodOfAnnotation(annotation, "dynamic");
+        Boolean optional = callMethodOfAnnotation(annotation, "optional");
+        Boolean multiple = callMethodOfAnnotation(annotation, "multiple");
         Boolean metatype = callMethodOfAnnotation(annotation, "metatype");
         String label = callMethodOfAnnotation(annotation, "label");
         String description = callMethodOfAnnotation(annotation, "description");
@@ -258,7 +232,9 @@ public class MetadataBuilder<C> {
         Object defaultValueArray = callMethodOfAnnotation(annotation, "defaultValue");
         V[] convertedDefaultValues = convertPrimitiveArray(defaultValueArray, builder.getValueType());
 
-        builder.withName(name)
+        builder.withDynamic(dynamic)
+                .withOptional(optional)
+                .withMultiple(multiple)
                 .withMetatype(metatype)
                 .withLabel(makeStringNullIfEmpty(label))
                 .withDescription(makeStringNullIfEmpty(description))
@@ -288,11 +264,17 @@ public class MetadataBuilder<C> {
 
         builder.withSetter(setter);
 
-        Boolean dynamic = callMethodOfAnnotation(annotation, "dynamic");
-        builder.withDynamic(dynamic);
-
-        Integer cardinality = callMethodOfAnnotation(annotation, "cardinality");
-        builder.withCardinality(cardinality);
+        String attributeId = callMethodOfAnnotation(annotation, "name");
+        attributeId = makeStringNullIfEmpty(attributeId);
+        String memberName = member.getName();
+        if (attributeId == null && member != null) {
+            if (member instanceof Field) {
+                attributeId = memberName;
+            } else if (member instanceof Method && memberName.startsWith("set") && memberName.length() > 3) {
+                attributeId = memberName.substring(3, 4).toLowerCase() + memberName.substring(4);
+            }
+        }
+        builder.withAttributeId(attributeId);
 
         fillAttributeMetaBuilder(member, annotation, builder);
 
@@ -451,26 +433,19 @@ public class MetadataBuilder<C> {
     }
 
     private void processReferenceAnnotation(Member member, Reference annotation) {
-        ReferenceAttribute attribute = annotation.attribute();
-        ReferenceAttributeMetadata referenceAttribute = new ReferenceAttributeMetadataBuilder()
-                .withDefaultValue(attribute.defaultValue())
-                .withDescription(makeStringNullIfEmpty(attribute.description()))
-                .withLabel(makeStringNullIfEmpty(attribute.label()))
-                .withMetatype(attribute.metatype())
-                .withName(makeStringNullIfEmpty(attribute.name()))
-                .withReferenceConfigurationType(convertReferenceAttributeType(attribute.configurationType()))
+
+        ReferenceMetadataBuilder builder = new ReferenceMetadataBuilder();
+        fillAttributeMetaBuilder(member, annotation, builder);
+
+        ReferenceMetadata referenceMetadata = builder.withBind(makeStringNullIfEmpty(annotation.bind()))
+                .withReferenceId(deriveReferenceId(member, annotation))
+                .withAttributeId(makeStringNullIfEmpty(annotation.attributeId()))
+                .withReferenceInterface(deriveReferenceInterface(member, annotation))
+                .withUnbind(makeStringNullIfEmpty(annotation.unbind()))
+                .withReferenceConfigurationType(convertReferenceConfigurationType(annotation.configurationType()))
                 .build();
 
-        ReferenceMetadata referenceMeta = new ReferenceMetadataBuilder()
-                .withName(deriveName(member, annotation))
-                .withReferenceInterface(deriveReferenceInterface(member, annotation))
-                .withBind(makeStringNullIfEmpty(annotation.bind()))
-                .withCardinality(convertAnnotationReferenceCardinality(annotation.cardinality()))
-                .withDynamic(annotation.dynamic())
-                .withUnbind(makeStringNullIfEmpty(annotation.unbind()))
-                .withAttribute(referenceAttribute).build();
-
-        attributes.add(referenceMeta);
+        attributes.add(referenceMetadata);
     }
 
     private void processShortAttributeAnnotation(Member element, Annotation annotation) {

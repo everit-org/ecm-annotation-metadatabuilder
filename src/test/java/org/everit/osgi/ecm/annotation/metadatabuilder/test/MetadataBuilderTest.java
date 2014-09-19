@@ -17,7 +17,7 @@
 package org.everit.osgi.ecm.annotation.metadatabuilder.test;
 
 import org.everit.osgi.ecm.annotation.metadatabuilder.MetadataBuilder;
-import org.everit.osgi.ecm.metadata.AttributeMetadataHolder;
+import org.everit.osgi.ecm.metadata.AttributeMetadata;
 import org.everit.osgi.ecm.metadata.ComponentMetadata;
 import org.everit.osgi.ecm.metadata.ReferenceMetadata;
 import org.junit.Assert;
@@ -30,16 +30,16 @@ public class MetadataBuilderTest {
         ComponentMetadata<AnnotatedClass> componentMeta = MetadataBuilder.buildComponentMetadata(
                 AnnotatedClass.class);
 
-        AttributeMetadataHolder<?>[] attributeHolders = componentMeta.getAttributeHolders();
+        AttributeMetadata<?>[] attributeHolders = componentMeta.getAttributes();
 
         Assert.assertEquals(2, attributeHolders.length);
 
         ReferenceMetadata referenceInReferences = (ReferenceMetadata) attributeHolders[0];
-        Assert.assertEquals("0.target", referenceInReferences.getAttribute().getName());
+        Assert.assertEquals("0.target", referenceInReferences.getAttributeId());
         Assert.assertNull(referenceInReferences.getReferenceInterface());
 
         ReferenceMetadata referenceOnField = (ReferenceMetadata) attributeHolders[1];
-        Assert.assertEquals("referenceWithOnlyDefault.clause", referenceOnField.getAttribute().getName());
+        Assert.assertEquals("referenceWithOnlyDefault.clause", referenceOnField.getAttributeId());
         Assert.assertEquals(Runnable.class, referenceOnField.getReferenceInterface());
     }
 }
