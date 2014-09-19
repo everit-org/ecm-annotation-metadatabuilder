@@ -264,7 +264,7 @@ public class MetadataBuilder<C> {
 
         builder.withSetter(setter);
 
-        String attributeId = callMethodOfAnnotation(annotation, "name");
+        String attributeId = callMethodOfAnnotation(annotation, "attributeId");
         attributeId = makeStringNullIfEmpty(attributeId);
         String memberName = member.getName();
         if (attributeId == null && member != null) {
