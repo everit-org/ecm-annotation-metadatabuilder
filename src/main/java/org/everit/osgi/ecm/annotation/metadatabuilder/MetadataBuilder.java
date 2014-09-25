@@ -30,10 +30,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.everit.osgi.ecm.annotation.Activate;
 import org.everit.osgi.ecm.annotation.AutoDetect;
 import org.everit.osgi.ecm.annotation.Component;
+import org.everit.osgi.ecm.annotation.Deactivate;
 import org.everit.osgi.ecm.annotation.Reference;
 import org.everit.osgi.ecm.annotation.References;
+import org.everit.osgi.ecm.annotation.Update;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttribute;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttributes;
 import org.everit.osgi.ecm.annotation.attribute.ByteAttribute;
@@ -61,6 +64,7 @@ import org.everit.osgi.ecm.metadata.ByteAttributeMetadata.ByteAttributeMetadataB
 import org.everit.osgi.ecm.metadata.CharacterAttributeMetadata.CharacterAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ComponentMetadata;
 import org.everit.osgi.ecm.metadata.ComponentMetadata.ComponentMetadataBuilder;
+import org.everit.osgi.ecm.metadata.ConfigurationPolicy;
 import org.everit.osgi.ecm.metadata.DoubleAttributeMetadata.DoubleAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.FloatAttributeMetadata.FloatAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.Icon;
@@ -76,8 +80,6 @@ import org.everit.osgi.ecm.metadata.ShortAttributeMetadata.ShortAttributeMetadat
 import org.everit.osgi.ecm.metadata.StringAttributeMetadata.StringAttributeMetadataBuilder;
 
 public class MetadataBuilder<C> {
-
-    // TODO activate, inactivate and modified methods
 
     private static final Set<Class<?>> ANNOTATION_CONTAINER_TYPES;
 
@@ -137,13 +139,16 @@ public class MetadataBuilder<C> {
                 .withConfigurationFactory(componentAnnotation.configurationFactory())
                 .withComponentId(makeStringNullIfEmpty(componentAnnotation.componentId()))
                 .withConfigurationPid(makeStringNullIfEmpty(componentAnnotation.configurationPid()))
-                .withConfigurationRequired(componentAnnotation.configurationRequired())
+                .withConfigurationPolicy(convertConfigurationPolicy(componentAnnotation.configurationPolicy()))
                 .withDescription(makeStringNullIfEmpty(componentAnnotation.description()))
                 .withIcons(convertIcons(componentAnnotation.icons()))
                 .withMetatype(componentAnnotation.metatype())
                 .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
                 .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()))
-                .withType(clazz);
+                .withType(clazz)
+                .withActivateMethod(findMethodWithAnnotation(Activate.class))
+                .withDeactivateMethod(findMethodWithAnnotation(Deactivate.class))
+                .withUpdateMethod(findMethodWithAnnotation(Update.class));
 
         generateMetaForAttributeHolders();
 
@@ -167,6 +172,19 @@ public class MetadataBuilder<C> {
             throw new RuntimeException(e);
         }
 
+    }
+
+    private ConfigurationPolicy convertConfigurationPolicy(
+            org.everit.osgi.ecm.annotation.ConfigurationPolicy configurationPolicy) {
+
+        switch (configurationPolicy) {
+        case IGNORE:
+            return ConfigurationPolicy.IGNORE;
+        case REQUIRE:
+            return ConfigurationPolicy.REQUIRE;
+        default:
+            return ConfigurationPolicy.OPTIONAL;
+        }
     }
 
     private Icon[] convertIcons(org.everit.osgi.ecm.annotation.Icon[] icons) {
@@ -307,6 +325,29 @@ public class MetadataBuilder<C> {
             options.put(value, label);
         }
         builder.withOptions(options);
+    }
+
+    private String findMethodWithAnnotation(Class<? extends Annotation> annotationClass) {
+        Method foundMethod = null;
+        Method[] methods = clazz.getDeclaredMethods();
+        for (Method method : methods) {
+            Annotation annotation = method.getAnnotation(annotationClass);
+            if (annotation != null) {
+                if (foundMethod != null) {
+                    throw new InconsistentAnnotationException("The '" + annotationClass.getName()
+                            + "' annotation is attached to more than one method in class '" + clazz.getName() + "'.");
+                }
+
+                foundMethod = method;
+
+            }
+        }
+
+        if (foundMethod != null) {
+            return foundMethod.getName();
+        } else {
+            return null;
+        }
     }
 
     private void generateAttributeMetaForAnnotatedElements(AnnotatedElement[] annotatedElements) {
