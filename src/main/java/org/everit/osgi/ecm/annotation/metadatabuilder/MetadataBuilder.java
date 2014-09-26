@@ -34,7 +34,7 @@ import org.everit.osgi.ecm.annotation.Activate;
 import org.everit.osgi.ecm.annotation.AutoDetect;
 import org.everit.osgi.ecm.annotation.Component;
 import org.everit.osgi.ecm.annotation.Deactivate;
-import org.everit.osgi.ecm.annotation.Reference;
+import org.everit.osgi.ecm.annotation.ServiceReference;
 import org.everit.osgi.ecm.annotation.References;
 import org.everit.osgi.ecm.annotation.Update;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttribute;
@@ -222,7 +222,7 @@ public class MetadataBuilder<C> {
         return null;
     }
 
-    private Class<?> deriveReferenceInterface(Member member, Reference annotation) {
+    private Class<?> deriveReferenceInterface(Member member, ServiceReference annotation) {
         Class<?> referenceInterface = annotation.referenceInterface();
         if (!AutoDetect.class.equals(referenceInterface)) {
             return referenceInterface;
@@ -400,8 +400,8 @@ public class MetadataBuilder<C> {
 
         if (ANNOTATION_CONTAINER_TYPES.contains(annotationType)) {
             processAnnotationContainer(annotation);
-        } else if (annotationType.equals(Reference.class)) {
-            processReferenceAnnotation(element, (Reference) annotation);
+        } else if (annotationType.equals(ServiceReference.class)) {
+            processReferenceAnnotation(element, (ServiceReference) annotation);
         } else if (annotationType.equals(BooleanAttribute.class)) {
             processBooleanAttributeAnnotation(element, annotation);
         } else if (annotationType.equals(ByteAttribute.class)) {
@@ -473,7 +473,7 @@ public class MetadataBuilder<C> {
         attributes.add(builder.build());
     }
 
-    private void processReferenceAnnotation(Member member, Reference annotation) {
+    private void processReferenceAnnotation(Member member, ServiceReference annotation) {
 
         ReferenceMetadataBuilder builder = new ReferenceMetadataBuilder();
         fillAttributeMetaBuilder(member, annotation, builder);
