@@ -17,14 +17,14 @@
 package org.everit.osgi.ecm.annotation.metadatabuilder.test;
 
 import org.everit.osgi.ecm.annotation.Component;
-import org.everit.osgi.ecm.annotation.Reference;
-import org.everit.osgi.ecm.annotation.ReferenceConfigurationType;
+//github.com/everit-org/ecm-annotation-metabuilder.git
 import org.everit.osgi.ecm.annotation.References;
+import org.everit.osgi.ecm.annotation.ServiceReference;
 
 @Component
-@References({ @Reference(referenceId = "0") })
+@References({ @ServiceReference(referenceId = "0") })
 public class AnnotatedClass {
 
-    @Reference(configurationType = ReferenceConfigurationType.CLAUSE)
+    @ServiceReference
     private Runnable referenceWithOnlyDefault;
 }
