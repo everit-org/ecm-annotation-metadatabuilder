@@ -32,10 +32,11 @@ import java.util.Set;
 
 import org.everit.osgi.ecm.annotation.Activate;
 import org.everit.osgi.ecm.annotation.AutoDetect;
+import org.everit.osgi.ecm.annotation.BundleCapabilityReference;
 import org.everit.osgi.ecm.annotation.Component;
 import org.everit.osgi.ecm.annotation.Deactivate;
-import org.everit.osgi.ecm.annotation.ServiceReference;
 import org.everit.osgi.ecm.annotation.References;
+import org.everit.osgi.ecm.annotation.ServiceReference;
 import org.everit.osgi.ecm.annotation.Update;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttribute;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttributes;
@@ -60,6 +61,7 @@ import org.everit.osgi.ecm.annotation.attribute.StringAttributes;
 import org.everit.osgi.ecm.metadata.AttributeMetadata;
 import org.everit.osgi.ecm.metadata.AttributeMetadata.AttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.BooleanAttributeMetadata.BooleanAttributeMetadataBuilder;
+import org.everit.osgi.ecm.metadata.BundleCapabilityReferenceMetadata.BundleCapabilityReferenceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ByteAttributeMetadata.ByteAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.CharacterAttributeMetadata.CharacterAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ComponentMetadata;
@@ -73,9 +75,9 @@ import org.everit.osgi.ecm.metadata.LongAttributeMetadata.LongAttributeMetadataB
 import org.everit.osgi.ecm.metadata.PasswordAttributeMetadata.PasswordAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.PropertyAttributeMetadata.PropertyAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ReferenceConfigurationType;
-import org.everit.osgi.ecm.metadata.ReferenceMetadata;
 import org.everit.osgi.ecm.metadata.ReferenceMetadata.ReferenceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.SelectablePropertyAttributeMetadata.SelectablePropertyAttributeMetadataBuilder;
+import org.everit.osgi.ecm.metadata.ServiceReferenceMetadata.ServiceReferenceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ShortAttributeMetadata.ShortAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.StringAttributeMetadata.StringAttributeMetadataBuilder;
 
@@ -222,7 +224,7 @@ public class MetadataBuilder<C> {
         return null;
     }
 
-    private Class<?> deriveReferenceInterface(Member member, ServiceReference annotation) {
+    private Class<?> deriveServiceInterface(Member member, ServiceReference annotation) {
         Class<?> referenceInterface = annotation.referenceInterface();
         if (!AutoDetect.class.equals(referenceInterface)) {
             return referenceInterface;
@@ -296,6 +298,21 @@ public class MetadataBuilder<C> {
 
         fillAttributeMetaBuilder(member, annotation, builder);
 
+    }
+
+    private <B extends ReferenceMetadataBuilder<B>> void fillReferenceBuilder(Member member,
+            Annotation annotation, ReferenceMetadataBuilder<B> builder) {
+
+        fillAttributeMetaBuilder(member, annotation, builder);
+
+        org.everit.osgi.ecm.annotation.ReferenceConfigurationType configurationType = callMethodOfAnnotation(
+                annotation, "configurationType");
+
+        builder.withBind(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "bind")))
+                .withReferenceId(deriveReferenceId(member, annotation))
+                .withAttributeId(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "attributeId")))
+                .withUnbind(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "unbind")))
+                .withReferenceConfigurationType(convertReferenceConfigurationType(configurationType));
     }
 
     private <V, B extends SelectablePropertyAttributeMetadataBuilder<V, B>> void fillSelectablePropertyAttributeBuilder(
@@ -401,7 +418,9 @@ public class MetadataBuilder<C> {
         if (ANNOTATION_CONTAINER_TYPES.contains(annotationType)) {
             processAnnotationContainer(annotation);
         } else if (annotationType.equals(ServiceReference.class)) {
-            processReferenceAnnotation(element, (ServiceReference) annotation);
+            processServiceReferenceAnnotation(element, (ServiceReference) annotation);
+        } else if (annotationType.equals(BundleCapabilityReference.class)) {
+            processBundleCapabilityReferenceAnnotation(element, (BundleCapabilityReference) annotation);
         } else if (annotationType.equals(BooleanAttribute.class)) {
             processBooleanAttributeAnnotation(element, annotation);
         } else if (annotationType.equals(ByteAttribute.class)) {
@@ -428,6 +447,13 @@ public class MetadataBuilder<C> {
     private void processBooleanAttributeAnnotation(Member element, Annotation annotation) {
         BooleanAttributeMetadataBuilder builder = new BooleanAttributeMetadataBuilder();
         fillPropertyAttributeBuilder(element, annotation, builder);
+        attributes.add(builder.build());
+    }
+
+    private void processBundleCapabilityReferenceAnnotation(Member member, BundleCapabilityReference annotation) {
+        BundleCapabilityReferenceMetadataBuilder builder = new BundleCapabilityReferenceMetadataBuilder();
+        fillReferenceBuilder(member, annotation, builder);
+        builder.withNamespace(annotation.namespace());
         attributes.add(builder.build());
     }
 
@@ -473,20 +499,11 @@ public class MetadataBuilder<C> {
         attributes.add(builder.build());
     }
 
-    private void processReferenceAnnotation(Member member, ServiceReference annotation) {
-
-        ReferenceMetadataBuilder builder = new ReferenceMetadataBuilder();
-        fillAttributeMetaBuilder(member, annotation, builder);
-
-        ReferenceMetadata referenceMetadata = builder.withBind(makeStringNullIfEmpty(annotation.bind()))
-                .withReferenceId(deriveReferenceId(member, annotation))
-                .withAttributeId(makeStringNullIfEmpty(annotation.attributeId()))
-                .withReferenceInterface(deriveReferenceInterface(member, annotation))
-                .withUnbind(makeStringNullIfEmpty(annotation.unbind()))
-                .withReferenceConfigurationType(convertReferenceConfigurationType(annotation.configurationType()))
-                .build();
-
-        attributes.add(referenceMetadata);
+    private void processServiceReferenceAnnotation(Member member, ServiceReference annotation) {
+        ServiceReferenceMetadataBuilder builder = new ServiceReferenceMetadataBuilder();
+        fillReferenceBuilder(member, annotation, builder);
+        builder.withServiceInterface(deriveServiceInterface(member, annotation));
+        attributes.add(builder.build());
     }
 
     private void processShortAttributeAnnotation(Member element, Annotation annotation) {
