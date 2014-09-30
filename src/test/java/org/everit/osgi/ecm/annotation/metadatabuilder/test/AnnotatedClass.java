@@ -18,11 +18,11 @@ package org.everit.osgi.ecm.annotation.metadatabuilder.test;
 
 import org.everit.osgi.ecm.annotation.Component;
 //github.com/everit-org/ecm-annotation-metabuilder.git
-import org.everit.osgi.ecm.annotation.References;
+import org.everit.osgi.ecm.annotation.ServiceReferences;
 import org.everit.osgi.ecm.annotation.ServiceReference;
 
 @Component
-@References({ @ServiceReference(referenceId = "0") })
+@ServiceReferences({ @ServiceReference(referenceId = "0") })
 public class AnnotatedClass {
 
     @ServiceReference
