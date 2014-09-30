@@ -189,6 +189,8 @@ public class MetadataBuilder<C> {
             return ConfigurationPolicy.IGNORE;
         case REQUIRE:
             return ConfigurationPolicy.REQUIRE;
+        case FACTORY:
+            return ConfigurationPolicy.FACTORY;
         default:
             return ConfigurationPolicy.OPTIONAL;
         }
