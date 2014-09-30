@@ -26,10 +26,11 @@ import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
 
 import org.everit.osgi.ecm.annotation.Activate;
+import org.everit.osgi.ecm.annotation.AttributeOrder;
 import org.everit.osgi.ecm.annotation.AutoDetect;
 import org.everit.osgi.ecm.annotation.BundleCapabilityReference;
 import org.everit.osgi.ecm.annotation.BundleCapabilityReferences;
@@ -122,7 +123,8 @@ public class MetadataBuilder<C> {
         return result;
     }
 
-    private final Map<String, AttributeMetadata<?>> attributes = new TreeMap<String, AttributeMetadata<?>>();
+    private LinkedHashMap<String, AttributeMetadata<?>> attributes =
+            new LinkedHashMap<String, AttributeMetadata<?>>();
 
     private Class<C> clazz;
 
@@ -155,7 +157,9 @@ public class MetadataBuilder<C> {
 
         generateMetaForAttributeHolders();
 
-        componentMetaBuilder.withAttributes(attributes.values().toArray(new AttributeMetadata<?>[0]));
+        orderedAttributes();
+        componentMetaBuilder.withAttributes(attributes.values().toArray(
+                new AttributeMetadata<?>[0]));
 
         return componentMetaBuilder.build();
     }
@@ -396,6 +400,36 @@ public class MetadataBuilder<C> {
             return null;
         }
         return text;
+    }
+
+    private void orderedAttributes() {
+        AttributeOrder attributeOrder = clazz.getAnnotation(AttributeOrder.class);
+        if (attributeOrder == null) {
+            return;
+        }
+
+        String[] orderArray = attributeOrder.value();
+        if (orderArray.length == 0) {
+            return;
+        }
+
+        LinkedHashMap<String, AttributeMetadata<?>> orderedAttributes =
+                new LinkedHashMap<String, AttributeMetadata<?>>();
+        for (String attributeId : orderArray) {
+            AttributeMetadata<?> attributeMetadata = attributes.remove(attributeId);
+            if (attributeMetadata == null) {
+                throw new InconsistentAnnotationException("Attribute with id '" + attributeId
+                        + "' that is defined in AttributeOrder on the class '" + clazz.getName() + "' does not exist.");
+            }
+            orderedAttributes.put(attributeId, attributeMetadata);
+        }
+
+        Set<Entry<String, AttributeMetadata<?>>> attributeEntries = attributes.entrySet();
+        for (Entry<String, AttributeMetadata<?>> attributeEntry : attributeEntries) {
+            orderedAttributes.put(attributeEntry.getKey(), attributeEntry.getValue());
+        }
+
+        this.attributes = orderedAttributes;
     }
 
     private void processAnnotationContainer(Annotation annotationContainer) {

@@ -16,15 +16,25 @@
  */
 package org.everit.osgi.ecm.annotation.metadatabuilder.test;
 
+import org.everit.osgi.ecm.annotation.AttributeOrder;
 import org.everit.osgi.ecm.annotation.Component;
-//github.com/everit-org/ecm-annotation-metabuilder.git
-import org.everit.osgi.ecm.annotation.ServiceReferences;
+import org.everit.osgi.ecm.annotation.ReferenceConfigurationType;
 import org.everit.osgi.ecm.annotation.ServiceReference;
+import org.everit.osgi.ecm.annotation.ServiceReferences;
+import org.everit.osgi.ecm.annotation.attribute.IntegerAttribute;
 
 @Component
 @ServiceReferences({ @ServiceReference(referenceId = "0") })
+@AttributeOrder({ "referenceWithOnlyDefault.clause", "intValue" })
 public class AnnotatedClass {
 
-    @ServiceReference
+    @IntegerAttribute
+    private int intValue;
+
+    @ServiceReference(configurationType = ReferenceConfigurationType.CLAUSE)
     private Runnable referenceWithOnlyDefault;
+
+    public void setIntValue(int intValue) {
+        this.intValue = intValue;
+    }
 }

@@ -19,6 +19,7 @@ package org.everit.osgi.ecm.annotation.metadatabuilder.test;
 import org.everit.osgi.ecm.annotation.metadatabuilder.MetadataBuilder;
 import org.everit.osgi.ecm.metadata.AttributeMetadata;
 import org.everit.osgi.ecm.metadata.ComponentMetadata;
+import org.everit.osgi.ecm.metadata.IntegerAttributeMetadata;
 import org.everit.osgi.ecm.metadata.ServiceReferenceMetadata;
 import org.junit.Assert;
 import org.junit.Test;
@@ -32,14 +33,18 @@ public class MetadataBuilderTest {
 
         AttributeMetadata<?>[] attributeHolders = componentMeta.getAttributes();
 
-        Assert.assertEquals(2, attributeHolders.length);
+        Assert.assertEquals(3, attributeHolders.length);
 
-        ServiceReferenceMetadata referenceInReferences = (ServiceReferenceMetadata) attributeHolders[0];
+        ServiceReferenceMetadata referenceOnField = (ServiceReferenceMetadata) attributeHolders[0];
+        Assert.assertEquals("referenceWithOnlyDefault.clause", referenceOnField.getAttributeId());
+        Assert.assertEquals(Runnable.class, referenceOnField.getServiceInterface());
+
+        IntegerAttributeMetadata intValueMetadata = (IntegerAttributeMetadata) attributeHolders[1];
+        Assert.assertEquals("intValue", intValueMetadata.getAttributeId());
+
+        ServiceReferenceMetadata referenceInReferences = (ServiceReferenceMetadata) attributeHolders[2];
         Assert.assertEquals("0.target", referenceInReferences.getAttributeId());
         Assert.assertNull(referenceInReferences.getServiceInterface());
 
-        ServiceReferenceMetadata referenceOnField = (ServiceReferenceMetadata) attributeHolders[1];
-        Assert.assertEquals("referenceWithOnlyDefault.clause", referenceOnField.getAttributeId());
-        Assert.assertEquals(Runnable.class, referenceOnField.getServiceInterface());
     }
 }
