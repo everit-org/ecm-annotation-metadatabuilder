@@ -111,6 +111,10 @@ public class MetadataBuilder<C> {
     private static <O> O[] convertPrimitiveArray(Object primitiveArray, Class<O> targetType) {
         int length = Array.getLength(primitiveArray);
 
+        if (length == 0) {
+            return null;
+        }
+
         @SuppressWarnings("unchecked")
         O[] result = (O[]) Array.newInstance(targetType, length);
 
