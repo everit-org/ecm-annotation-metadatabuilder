@@ -277,24 +277,6 @@ public class MetadataBuilder<C> {
             Annotation annotation,
             PropertyAttributeMetadataBuilder<V, B> builder) {
 
-        String setter = callMethodOfAnnotation(annotation, "setter");
-        setter = makeStringNullIfEmpty(setter);
-        if (setter == null && member != null) {
-            if (member instanceof Method) {
-                setter = member.getName();
-            } else if (member instanceof Field) {
-                String fieldName = member.getName();
-                try {
-                    Method method = clazz.getMethod("set" + fieldName, ((Field) member).getType());
-                    setter = method.getName();
-                } catch (NoSuchMethodException | SecurityException e) {
-                    // Do nothing as in this case there will be no setter
-                }
-            }
-        }
-
-        builder.withSetter(setter);
-
         String attributeId = callMethodOfAnnotation(annotation, "attributeId");
         attributeId = makeStringNullIfEmpty(attributeId);
         String memberName = member.getName();
@@ -309,6 +291,42 @@ public class MetadataBuilder<C> {
 
         fillAttributeMetaBuilder(member, annotation, builder);
 
+        String setter = callMethodOfAnnotation(annotation, "setter");
+        setter = makeStringNullIfEmpty(setter);
+        if (setter == null) {
+            if (member != null) {
+                if (member instanceof Method) {
+                    builder.withSetter((Method) member);
+                } else if (member instanceof Field) {
+                    String fieldName = member.getName();
+                    try {
+                        Method method = clazz.getMethod("set" + fieldName, ((Field) member).getType());
+                        builder.withSetter(method);
+                    } catch (NoSuchMethodException e) {
+                        // Do nothing as in this case there will be no setter
+                    }
+                }
+            }
+        } else {
+            Method method = null;
+            Method[] potentialMethods = clazz.getMethods();
+            for (int i = 0; i < potentialMethods.length && method == null; i++) {
+                Method potentialMethod = potentialMethods[i];
+                if (potentialMethod.getName().equals(setter)) {
+                    Class<?>[] parameterTypes = potentialMethod.getParameterTypes();
+                    if (parameterTypes.length == 1) {
+                        // TODO Do more checks about the function. Currently, if there are multiple methods with the
+                        // same name but with different parameter type, we will have a problem.
+                        method = potentialMethod;
+                    }
+                }
+            }
+            if (method == null) {
+                throw new MetadataValidationException("Could not find setter '" + setter + "' for annotation "
+                        + annotation.toString() + " on class " + clazz.toString());
+            }
+            builder.withSetter(method);
+        }
     }
 
     private <B extends ReferenceMetadataBuilder<B>> void fillReferenceBuilder(Member member,
