@@ -103,7 +103,7 @@ public class MetadataBuilder<C> {
         ANNOTATION_CONTAINER_TYPES.add(StringAttributes.class);
     }
 
-    public static <C> ComponentMetadata<C> buildComponentMetadata(Class<C> clazz) {
+    public static <C> ComponentMetadata buildComponentMetadata(Class<C> clazz) {
         MetadataBuilder<C> metadataBuilder = new MetadataBuilder<C>(clazz);
         return metadataBuilder.build();
     }
@@ -139,13 +139,13 @@ public class MetadataBuilder<C> {
         this.clazz = clazz;
     }
 
-    private ComponentMetadata<C> build() {
+    private ComponentMetadata build() {
         Component componentAnnotation = clazz.getAnnotation(Component.class);
         if (componentAnnotation == null) {
             throw new ComponentAnnotationMissingException("Component annotation is missing on type " + clazz.toString());
         }
 
-        ComponentMetadataBuilder<C> componentMetaBuilder = new ComponentMetadataBuilder<C>()
+        ComponentMetadataBuilder componentMetaBuilder = new ComponentMetadataBuilder()
                 .withComponentId(makeStringNullIfEmpty(componentAnnotation.componentId()))
                 .withConfigurationPid(makeStringNullIfEmpty(componentAnnotation.configurationPid()))
                 .withConfigurationPolicy(convertConfigurationPolicy(componentAnnotation.configurationPolicy()))
@@ -154,7 +154,7 @@ public class MetadataBuilder<C> {
                 .withMetatype(componentAnnotation.metatype())
                 .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
                 .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()))
-                .withType(clazz)
+                .withType(clazz.getName())
                 .withActivateMethod(findMethodWithAnnotation(Activate.class))
                 .withDeactivateMethod(findMethodWithAnnotation(Deactivate.class))
                 .withUpdateMethod(findMethodWithAnnotation(Update.class));
@@ -296,12 +296,12 @@ public class MetadataBuilder<C> {
         if (setter == null) {
             if (member != null) {
                 if (member instanceof Method) {
-                    builder.withSetter((Method) member);
+                    builder.withSetter(member.getName());
                 } else if (member instanceof Field) {
                     String fieldName = member.getName();
                     try {
                         Method method = clazz.getMethod("set" + fieldName, ((Field) member).getType());
-                        builder.withSetter(method);
+                        builder.withSetter(method.getName());
                     } catch (NoSuchMethodException e) {
                         // Do nothing as in this case there will be no setter
                     }
@@ -325,7 +325,7 @@ public class MetadataBuilder<C> {
                 throw new MetadataValidationException("Could not find setter '" + setter + "' for annotation "
                         + annotation.toString() + " on class " + clazz.toString());
             }
-            builder.withSetter(method);
+            builder.withSetter(method.getName());
         }
     }
 

@@ -28,7 +28,7 @@ public class MetadataBuilderTest {
 
     @Test
     public void testAnnotatedClass() {
-        ComponentMetadata<AnnotatedClass> componentMeta = MetadataBuilder.buildComponentMetadata(
+        ComponentMetadata componentMeta = MetadataBuilder.buildComponentMetadata(
                 AnnotatedClass.class);
 
         AttributeMetadata<?>[] attributeHolders = componentMeta.getAttributes();
