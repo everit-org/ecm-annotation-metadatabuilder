@@ -23,8 +23,10 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -82,6 +84,8 @@ import org.everit.osgi.ecm.metadata.SelectablePropertyAttributeMetadata.Selectab
 import org.everit.osgi.ecm.metadata.ServiceReferenceMetadata.ServiceReferenceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ShortAttributeMetadata.ShortAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.StringAttributeMetadata.StringAttributeMetadataBuilder;
+import org.everit.osgi.ecm.util.method.MethodDescriptor;
+import org.everit.osgi.ecm.util.method.MethodUtil;
 
 public class MetadataBuilder<C> {
 
@@ -155,9 +159,9 @@ public class MetadataBuilder<C> {
                 .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
                 .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()))
                 .withType(clazz.getName())
-                .withActivateMethod(findMethodWithAnnotation(Activate.class))
-                .withDeactivateMethod(findMethodWithAnnotation(Deactivate.class))
-                .withUpdateMethod(findMethodWithAnnotation(Update.class));
+                .withActivate(findMethodWithAnnotation(Activate.class))
+                .withDeactivate(findMethodWithAnnotation(Deactivate.class))
+                .withUpdate(findMethodWithAnnotation(Update.class));
 
         generateMetaForAttributeHolders();
 
@@ -279,53 +283,36 @@ public class MetadataBuilder<C> {
 
         String attributeId = callMethodOfAnnotation(annotation, "attributeId");
         attributeId = makeStringNullIfEmpty(attributeId);
-        String memberName = member.getName();
+
         if (attributeId == null && member != null) {
+            String memberName = member.getName();
             if (member instanceof Field) {
                 attributeId = memberName;
             } else if (member instanceof Method && memberName.startsWith("set") && memberName.length() > 3) {
                 attributeId = memberName.substring(3, 4).toLowerCase() + memberName.substring(4);
             }
         }
-        builder.withAttributeId(attributeId);
 
         fillAttributeMetaBuilder(member, annotation, builder);
 
         String setter = callMethodOfAnnotation(annotation, "setter");
         setter = makeStringNullIfEmpty(setter);
-        if (setter == null) {
-            if (member != null) {
-                if (member instanceof Method) {
-                    builder.withSetter(member.getName());
-                } else if (member instanceof Field) {
-                    String fieldName = member.getName();
-                    try {
-                        Method method = clazz.getMethod("set" + fieldName, ((Field) member).getType());
-                        builder.withSetter(method.getName());
-                    } catch (NoSuchMethodException e) {
-                        // Do nothing as in this case there will be no setter
-                    }
+
+        if (setter != null) {
+            builder.withSetter(new MethodDescriptor(setter));
+        } else if (member != null) {
+            if (member instanceof Method) {
+                builder.withSetter(new MethodDescriptor((Method) member));
+            } else if (member instanceof Field) {
+                String fieldName = member.getName();
+                String setterName = "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+
+                MethodDescriptor methodDescriptor = resolveSetter(annotation, builder, setterName);
+
+                if (methodDescriptor != null) {
+                    builder.withSetter(methodDescriptor);
                 }
             }
-        } else {
-            Method method = null;
-            Method[] potentialMethods = clazz.getMethods();
-            for (int i = 0; i < potentialMethods.length && method == null; i++) {
-                Method potentialMethod = potentialMethods[i];
-                if (potentialMethod.getName().equals(setter)) {
-                    Class<?>[] parameterTypes = potentialMethod.getParameterTypes();
-                    if (parameterTypes.length == 1) {
-                        // TODO Do more checks about the function. Currently, if there are multiple methods with the
-                        // same name but with different parameter type, we will have a problem.
-                        method = potentialMethod;
-                    }
-                }
-            }
-            if (method == null) {
-                throw new MetadataValidationException("Could not find setter '" + setter + "' for annotation "
-                        + annotation.toString() + " on class " + clazz.toString());
-            }
-            builder.withSetter(method.getName());
         }
     }
 
@@ -337,10 +324,21 @@ public class MetadataBuilder<C> {
         org.everit.osgi.ecm.annotation.ReferenceConfigurationType configurationType = callMethodOfAnnotation(
                 annotation, "configurationType");
 
-        builder.withBind(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "bind")))
-                .withReferenceId(deriveReferenceId(member, annotation))
+        String bindName = makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "bind"));
+
+        if (bindName != null) {
+            builder.withBind(new MethodDescriptor(bindName));
+        } else if (member instanceof Method) {
+            builder.withBind(new MethodDescriptor((Method) member));
+        }
+
+        String unbindName = makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "unbind"));
+        if (unbindName != null) {
+            builder.withUnbind(new MethodDescriptor(unbindName));
+        }
+
+        builder.withReferenceId(deriveReferenceId(member, annotation))
                 .withAttributeId(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "attributeId")))
-                .withUnbind(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "unbind")))
                 .withReferenceConfigurationType(convertReferenceConfigurationType(configurationType));
     }
 
@@ -373,7 +371,7 @@ public class MetadataBuilder<C> {
         builder.withOptions(options);
     }
 
-    private String findMethodWithAnnotation(Class<? extends Annotation> annotationClass) {
+    private MethodDescriptor findMethodWithAnnotation(Class<? extends Annotation> annotationClass) {
         Method foundMethod = null;
         Method[] methods = clazz.getDeclaredMethods();
         for (Method method : methods) {
@@ -390,7 +388,7 @@ public class MetadataBuilder<C> {
         }
 
         if (foundMethod != null) {
-            return foundMethod.getName();
+            return new MethodDescriptor(foundMethod);
         } else {
             return null;
         }
@@ -587,5 +585,38 @@ public class MetadataBuilder<C> {
             throw new MetadataValidationException("Duplicate attribute id '" + attributeMetadata.getAttributeId()
                     + "' found in class '" + clazz.getName() + "'.");
         }
+    }
+
+    private <V, B extends PropertyAttributeMetadataBuilder<V, B>> MethodDescriptor resolveSetter(
+            Annotation annotation, PropertyAttributeMetadataBuilder<V, B> builder, String setterName) {
+
+        List<MethodDescriptor> potentialDescriptors = new ArrayList<MethodDescriptor>();
+        Class<?> primitiveType = builder.getPrimitiveType();
+        Boolean multiple = callMethodOfAnnotation(annotation, "multiple");
+
+        if (multiple) {
+            Class<?> multipleType = primitiveType;
+            if (primitiveType == null) {
+                multipleType = builder.getValueType();
+            }
+            String parameterTypeName = multipleType.getCanonicalName() + "[]";
+            potentialDescriptors.add(new MethodDescriptor(setterName, new String[] { parameterTypeName }));
+        } else {
+            if (primitiveType != null) {
+                potentialDescriptors.add(new MethodDescriptor(setterName,
+                        new String[] { primitiveType.getSimpleName() }));
+            }
+            potentialDescriptors.add(new MethodDescriptor(setterName, new String[] { builder.getValueType()
+                    .getCanonicalName() }));
+
+        }
+
+        Method method = MethodUtil.locateMethodByPreference(clazz, false,
+                potentialDescriptors.toArray(new MethodDescriptor[potentialDescriptors.size()]));
+
+        if (method == null) {
+            return null;
+        }
+        return new MethodDescriptor(method);
     }
 }
