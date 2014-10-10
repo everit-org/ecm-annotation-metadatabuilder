@@ -251,11 +251,25 @@ public class MetadataBuilder<C> {
     private Class<?> deriveServiceInterface(Member member, ServiceReference annotation) {
         Class<?> referenceInterface = annotation.referenceInterface();
         if (!AutoDetect.class.equals(referenceInterface)) {
+            if (Void.class.equals(referenceInterface)) {
+                return null;
+            }
             return referenceInterface;
         }
 
-        if (member != null && member instanceof Field) {
-            return ((Field) member).getType();
+        if (member != null) {
+            if (member instanceof Field) {
+                return ((Field) member).getType();
+            } else if (member instanceof Method) {
+                Method method = ((Method) member);
+                Class<?>[] parameterTypes = method.getParameterTypes();
+                if (parameterTypes.length != 1 || parameterTypes[0].isPrimitive()) {
+                    throw new InconsistentAnnotationException(
+                            "Reference auto detection can work only on a method that has one non-primitive parameter:"
+                                    + method.toGenericString());
+                }
+                return parameterTypes[0];
+            }
         }
 
         return null;
