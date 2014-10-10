@@ -232,8 +232,17 @@ public class MetadataBuilder<C> {
             return name;
         }
 
-        if (member != null && member instanceof Field) {
-            return member.getName();
+        if (member != null) {
+            String memberName = member.getName();
+            if (member instanceof Field) {
+                return memberName;
+            } else if (member instanceof Method) {
+                String referenceId = resolveIdIfMethodNameStartsWith(memberName, "bind");
+                if (referenceId != null) {
+                    return referenceId;
+                }
+                return resolveIdIfMethodNameStartsWith(memberName, "set");
+            }
         }
 
         return null;
@@ -288,10 +297,11 @@ public class MetadataBuilder<C> {
             String memberName = member.getName();
             if (member instanceof Field) {
                 attributeId = memberName;
-            } else if (member instanceof Method && memberName.startsWith("set") && memberName.length() > 3) {
-                attributeId = memberName.substring(3, 4).toLowerCase() + memberName.substring(4);
+            } else if (member instanceof Method) {
+                attributeId = resolveIdIfMethodNameStartsWith(memberName, "set");
             }
         }
+        builder.withAttributeId(attributeId);
 
         fillAttributeMetaBuilder(member, annotation, builder);
 
@@ -324,6 +334,15 @@ public class MetadataBuilder<C> {
         org.everit.osgi.ecm.annotation.ReferenceConfigurationType configurationType = callMethodOfAnnotation(
                 annotation, "configurationType");
 
+        ReferenceConfigurationType convertedConfigurationType = convertReferenceConfigurationType(configurationType);
+
+        String referenceId = deriveReferenceId(member, annotation);
+
+        if (referenceId == null) {
+            throw new MetadataValidationException(
+                    "Reference id for one of the references could not be determined in class " + clazz.getName());
+        }
+
         String bindName = makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "bind"));
 
         if (bindName != null) {
@@ -337,9 +356,9 @@ public class MetadataBuilder<C> {
             builder.withUnbind(new MethodDescriptor(unbindName));
         }
 
-        builder.withReferenceId(deriveReferenceId(member, annotation))
+        builder.withReferenceId(referenceId)
                 .withAttributeId(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "attributeId")))
-                .withReferenceConfigurationType(convertReferenceConfigurationType(configurationType));
+                .withReferenceConfigurationType(convertedConfigurationType);
     }
 
     private <V, B extends SelectablePropertyAttributeMetadataBuilder<V, B>> void fillSelectablePropertyAttributeBuilder(
@@ -584,6 +603,16 @@ public class MetadataBuilder<C> {
         if (existing != null) {
             throw new MetadataValidationException("Duplicate attribute id '" + attributeMetadata.getAttributeId()
                     + "' found in class '" + clazz.getName() + "'.");
+        }
+    }
+
+    private String resolveIdIfMethodNameStartsWith(String memberName, String prefix) {
+        int prefixLength = prefix.length();
+        if (memberName.startsWith(prefix) && memberName.length() > prefixLength) {
+            return memberName.substring(prefixLength, prefixLength + 1).toLowerCase()
+                    + memberName.substring(prefixLength + 1);
+        } else {
+            return null;
         }
     }
 
