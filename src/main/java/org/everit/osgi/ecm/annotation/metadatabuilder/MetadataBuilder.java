@@ -38,6 +38,7 @@ import org.everit.osgi.ecm.annotation.BundleCapabilityReference;
 import org.everit.osgi.ecm.annotation.BundleCapabilityReferences;
 import org.everit.osgi.ecm.annotation.Component;
 import org.everit.osgi.ecm.annotation.Deactivate;
+import org.everit.osgi.ecm.annotation.Service;
 import org.everit.osgi.ecm.annotation.ServiceReference;
 import org.everit.osgi.ecm.annotation.ServiceReferences;
 import org.everit.osgi.ecm.annotation.Update;
@@ -81,6 +82,7 @@ import org.everit.osgi.ecm.metadata.PropertyAttributeMetadata.PropertyAttributeM
 import org.everit.osgi.ecm.metadata.ReferenceConfigurationType;
 import org.everit.osgi.ecm.metadata.ReferenceMetadata.ReferenceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.SelectablePropertyAttributeMetadata.SelectablePropertyAttributeMetadataBuilder;
+import org.everit.osgi.ecm.metadata.ServiceMetadata.ServiceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ServiceReferenceMetadata.ServiceReferenceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ShortAttributeMetadata.ShortAttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.StringAttributeMetadata.StringAttributeMetadataBuilder;
@@ -165,9 +167,20 @@ public class MetadataBuilder<C> {
 
         generateMetaForAttributeHolders();
 
-        orderedAttributes();
+        orderAttributes();
         componentMetaBuilder.withAttributes(attributes.values().toArray(
                 new AttributeMetadata<?>[0]));
+
+        Service serviceAnnotation = clazz.getAnnotation(Service.class);
+
+        if (serviceAnnotation != null) {
+            ServiceMetadataBuilder serviceMetadataBuilder = new ServiceMetadataBuilder();
+            Class<?>[] serviceInterfaces = serviceAnnotation.value();
+            if (!(serviceInterfaces.length == 1 && serviceInterfaces[0].equals(AutoDetect.class))) {
+                serviceMetadataBuilder.withClazzes(serviceInterfaces);
+            }
+            componentMetaBuilder.withService(serviceMetadataBuilder.build());
+        }
 
         return componentMetaBuilder.build();
     }
@@ -457,7 +470,7 @@ public class MetadataBuilder<C> {
         return text;
     }
 
-    private void orderedAttributes() {
+    private void orderAttributes() {
         AttributeOrder attributeOrder = clazz.getAnnotation(AttributeOrder.class);
         if (attributeOrder == null) {
             return;
