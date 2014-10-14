@@ -176,9 +176,7 @@ public class MetadataBuilder<C> {
         if (serviceAnnotation != null) {
             ServiceMetadataBuilder serviceMetadataBuilder = new ServiceMetadataBuilder();
             Class<?>[] serviceInterfaces = serviceAnnotation.value();
-            if (!(serviceInterfaces.length == 1 && serviceInterfaces[0].equals(AutoDetect.class))) {
-                serviceMetadataBuilder.withClazzes(serviceInterfaces);
-            }
+            serviceMetadataBuilder.withClazzes(serviceInterfaces);
             componentMetaBuilder.withService(serviceMetadataBuilder.build());
         }
 
