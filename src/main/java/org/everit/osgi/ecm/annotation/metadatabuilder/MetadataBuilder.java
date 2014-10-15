@@ -41,6 +41,7 @@ import org.everit.osgi.ecm.annotation.Deactivate;
 import org.everit.osgi.ecm.annotation.Service;
 import org.everit.osgi.ecm.annotation.ServiceReference;
 import org.everit.osgi.ecm.annotation.ServiceReferences;
+import org.everit.osgi.ecm.annotation.ThreeStateBoolean;
 import org.everit.osgi.ecm.annotation.Update;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttribute;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttributes;
@@ -293,7 +294,7 @@ public class MetadataBuilder<C> {
 
         Boolean dynamic = callMethodOfAnnotation(annotation, "dynamic");
         Boolean optional = callMethodOfAnnotation(annotation, "optional");
-        Boolean multiple = callMethodOfAnnotation(annotation, "multiple");
+        boolean multiple = resolveMultiple(annotation, member);
         Boolean metatype = callMethodOfAnnotation(annotation, "metatype");
         String label = callMethodOfAnnotation(annotation, "label");
         String description = callMethodOfAnnotation(annotation, "description");
@@ -639,6 +640,47 @@ public class MetadataBuilder<C> {
         } else {
             return null;
         }
+    }
+
+    private boolean resolveMultiple(Annotation annotation, Member member) {
+        ThreeStateBoolean multiple = callMethodOfAnnotation(annotation, "multiple");
+        if (multiple == ThreeStateBoolean.TRUE) {
+            return true;
+        }
+        if (multiple == ThreeStateBoolean.FALSE) {
+            return false;
+        }
+
+        if (member == null) {
+            throw new InconsistentAnnotationException(
+                    "Could not determine the multiplicity of attribute based on annotation '"
+                            + annotation.toString() + "' in the class " + clazz.getName());
+        }
+
+        if (member instanceof Method) {
+            Class<?>[] parameterTypes = ((Method) member).getParameterTypes();
+            if (parameterTypes.length == 0) {
+                throw new InconsistentAnnotationException(
+                        "Could not determine the multiplicity of attribute based on annotation '"
+                                + annotation.toString() + "' that is defined on the method '" + member.toString()
+                                + "' in the class " + clazz.getName());
+            }
+            if (parameterTypes[0].isArray()) {
+                return true;
+            } else {
+                return false;
+            }
+        } else if (member instanceof Field) {
+            Class<?> fieldType = ((Field) member).getType();
+            if (fieldType.isArray()) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        throw new InconsistentAnnotationException(
+                "Could not determine the multiplicity of attribute based on annotation '"
+                        + annotation.toString() + "' in the class " + clazz.getName());
     }
 
     private <V, B extends PropertyAttributeMetadataBuilder<V, B>> MethodDescriptor resolveSetter(
