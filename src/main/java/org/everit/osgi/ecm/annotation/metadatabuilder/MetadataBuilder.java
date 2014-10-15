@@ -652,9 +652,7 @@ public class MetadataBuilder<C> {
         }
 
         if (member == null) {
-            throw new InconsistentAnnotationException(
-                    "Could not determine the multiplicity of attribute based on annotation '"
-                            + annotation.toString() + "' in the class " + clazz.getName());
+            return false;
         }
 
         if (member instanceof Method) {
@@ -688,7 +686,7 @@ public class MetadataBuilder<C> {
 
         List<MethodDescriptor> potentialDescriptors = new ArrayList<MethodDescriptor>();
         Class<?> primitiveType = builder.getPrimitiveType();
-        Boolean multiple = callMethodOfAnnotation(annotation, "multiple");
+        boolean multiple = resolveMultiple(annotation, null);
 
         if (multiple) {
             Class<?> multipleType = primitiveType;
