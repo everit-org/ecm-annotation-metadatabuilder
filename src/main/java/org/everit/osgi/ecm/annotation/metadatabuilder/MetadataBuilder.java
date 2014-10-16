@@ -551,7 +551,7 @@ public class MetadataBuilder<C> {
     private void processBundleCapabilityReferenceAnnotation(Member member, BundleCapabilityReference annotation) {
         BundleCapabilityReferenceMetadataBuilder builder = new BundleCapabilityReferenceMetadataBuilder();
         fillReferenceBuilder(member, annotation, builder);
-        builder.withNamespace(annotation.namespace());
+        builder.withNamespace(annotation.namespace()).withStateMask(annotation.stateMask());
         putIntoAttributes(builder);
     }
 
