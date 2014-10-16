@@ -377,11 +377,6 @@ public class MetadataBuilder<C> {
             builder.withBind(new MethodDescriptor((Method) member));
         }
 
-        String unbindName = makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "unbind"));
-        if (unbindName != null) {
-            builder.withUnbind(new MethodDescriptor(unbindName));
-        }
-
         builder.withReferenceId(referenceId)
                 .withAttributeId(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "attributeId")))
                 .withReferenceConfigurationType(convertedConfigurationType);
@@ -686,7 +681,7 @@ public class MetadataBuilder<C> {
 
         List<MethodDescriptor> potentialDescriptors = new ArrayList<MethodDescriptor>();
         Class<?> primitiveType = builder.getPrimitiveType();
-        boolean multiple = resolveMultiple(annotation, null);
+        boolean multiple = builder.isMultiple();
 
         if (multiple) {
             Class<?> multipleType = primitiveType;
