@@ -34,13 +34,13 @@ import java.util.Set;
 import org.everit.osgi.ecm.annotation.Activate;
 import org.everit.osgi.ecm.annotation.AttributeOrder;
 import org.everit.osgi.ecm.annotation.AutoDetect;
-import org.everit.osgi.ecm.annotation.BundleCapabilityReference;
-import org.everit.osgi.ecm.annotation.BundleCapabilityReferences;
+import org.everit.osgi.ecm.annotation.BundleCapabilityRef;
+import org.everit.osgi.ecm.annotation.BundleCapabilityRefs;
 import org.everit.osgi.ecm.annotation.Component;
 import org.everit.osgi.ecm.annotation.Deactivate;
 import org.everit.osgi.ecm.annotation.Service;
-import org.everit.osgi.ecm.annotation.ServiceReference;
-import org.everit.osgi.ecm.annotation.ServiceReferences;
+import org.everit.osgi.ecm.annotation.ServiceRef;
+import org.everit.osgi.ecm.annotation.ServiceRefs;
 import org.everit.osgi.ecm.annotation.ThreeStateBoolean;
 import org.everit.osgi.ecm.annotation.Update;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttribute;
@@ -96,8 +96,8 @@ public class MetadataBuilder<C> {
 
     static {
         ANNOTATION_CONTAINER_TYPES = new HashSet<Class<?>>();
-        ANNOTATION_CONTAINER_TYPES.add(ServiceReferences.class);
-        ANNOTATION_CONTAINER_TYPES.add(BundleCapabilityReferences.class);
+        ANNOTATION_CONTAINER_TYPES.add(ServiceRefs.class);
+        ANNOTATION_CONTAINER_TYPES.add(BundleCapabilityRefs.class);
         ANNOTATION_CONTAINER_TYPES.add(BooleanAttributes.class);
         ANNOTATION_CONTAINER_TYPES.add(ByteAttributes.class);
         ANNOTATION_CONTAINER_TYPES.add(CharacterAttributes.class);
@@ -260,7 +260,7 @@ public class MetadataBuilder<C> {
         return null;
     }
 
-    private Class<?> deriveServiceInterface(Member member, ServiceReference annotation) {
+    private Class<?> deriveServiceInterface(Member member, ServiceRef annotation) {
         Class<?> referenceInterface = annotation.referenceInterface();
         if (!AutoDetect.class.equals(referenceInterface)) {
             if (Void.class.equals(referenceInterface)) {
@@ -514,10 +514,10 @@ public class MetadataBuilder<C> {
 
         if (ANNOTATION_CONTAINER_TYPES.contains(annotationType)) {
             processAnnotationContainer(annotation);
-        } else if (annotationType.equals(ServiceReference.class)) {
-            processServiceReferenceAnnotation(element, (ServiceReference) annotation);
-        } else if (annotationType.equals(BundleCapabilityReference.class)) {
-            processBundleCapabilityReferenceAnnotation(element, (BundleCapabilityReference) annotation);
+        } else if (annotationType.equals(ServiceRef.class)) {
+            processServiceReferenceAnnotation(element, (ServiceRef) annotation);
+        } else if (annotationType.equals(BundleCapabilityRef.class)) {
+            processBundleCapabilityReferenceAnnotation(element, (BundleCapabilityRef) annotation);
         } else if (annotationType.equals(BooleanAttribute.class)) {
             processBooleanAttributeAnnotation(element, annotation);
         } else if (annotationType.equals(ByteAttribute.class)) {
@@ -548,7 +548,7 @@ public class MetadataBuilder<C> {
         putIntoAttributes(builder);
     }
 
-    private void processBundleCapabilityReferenceAnnotation(Member member, BundleCapabilityReference annotation) {
+    private void processBundleCapabilityReferenceAnnotation(Member member, BundleCapabilityRef annotation) {
         BundleCapabilityReferenceMetadataBuilder builder = new BundleCapabilityReferenceMetadataBuilder();
         fillReferenceBuilder(member, annotation, builder);
         builder.withNamespace(annotation.namespace()).withStateMask(annotation.stateMask());
@@ -597,7 +597,7 @@ public class MetadataBuilder<C> {
         putIntoAttributes(builder);
     }
 
-    private void processServiceReferenceAnnotation(Member member, ServiceReference annotation) {
+    private void processServiceReferenceAnnotation(Member member, ServiceRef annotation) {
         ServiceReferenceMetadataBuilder builder = new ServiceReferenceMetadataBuilder();
         fillReferenceBuilder(member, annotation, builder);
         builder.withServiceInterface(deriveServiceInterface(member, annotation));
