@@ -249,7 +249,7 @@ public class MetadataBuilder<C> {
             if (member instanceof Field) {
                 return memberName;
             } else if (member instanceof Method) {
-                String referenceId = resolveIdIfMethodNameStartsWith(memberName, "bind");
+                String referenceId = resolveIdIfMethodNameStartsWith(memberName, "setter");
                 if (referenceId != null) {
                     return referenceId;
                 }
@@ -372,9 +372,9 @@ public class MetadataBuilder<C> {
         String bindName = makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "bind"));
 
         if (bindName != null) {
-            builder.withBind(new MethodDescriptor(bindName));
+            builder.withSetter(new MethodDescriptor(bindName));
         } else if (member instanceof Method) {
-            builder.withBind(new MethodDescriptor((Method) member));
+            builder.withSetter(new MethodDescriptor((Method) member));
         }
 
         builder.withReferenceId(referenceId)
