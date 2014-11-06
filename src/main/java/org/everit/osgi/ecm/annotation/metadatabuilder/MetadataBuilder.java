@@ -20,9 +20,13 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -63,6 +67,7 @@ import org.everit.osgi.ecm.annotation.attribute.ShortAttribute;
 import org.everit.osgi.ecm.annotation.attribute.ShortAttributes;
 import org.everit.osgi.ecm.annotation.attribute.StringAttribute;
 import org.everit.osgi.ecm.annotation.attribute.StringAttributes;
+import org.everit.osgi.ecm.component.ServiceHolder;
 import org.everit.osgi.ecm.metadata.AttributeMetadata;
 import org.everit.osgi.ecm.metadata.AttributeMetadata.AttributeMetadataBuilder;
 import org.everit.osgi.ecm.metadata.BooleanAttributeMetadata.BooleanAttributeMetadataBuilder;
@@ -271,7 +276,7 @@ public class MetadataBuilder<C> {
 
         if (member != null) {
             if (member instanceof Field) {
-                return ((Field) member).getType();
+                return resolveServiceInterfaceBasedOnGenericType(((Field) member).getGenericType());
             } else if (member instanceof Method) {
                 Method method = ((Method) member);
                 Class<?>[] parameterTypes = method.getParameterTypes();
@@ -280,11 +285,81 @@ public class MetadataBuilder<C> {
                             "Reference auto detection can work only on a method that has one non-primitive parameter:"
                                     + method.toGenericString());
                 }
-                return parameterTypes[0];
+
+                return resolveServiceInterfaceBasedOnGenericType(method.getGenericParameterTypes()[0]);
             }
         }
 
         return null;
+    }
+
+    private Class<?> resolveServiceInterfaceBasedOnGenericType(Type genericType) {
+        if (genericType instanceof Class) {
+            Class<?> classType = (Class<?>) genericType;
+            if (!classType.isArray()) {
+                return classType;
+            }
+            Class<?> componentType = classType.getComponentType();
+            return resolveServiceInterfaceBasedOnClassType(componentType);
+        }
+
+        if (genericType instanceof GenericArrayType) {
+            GenericArrayType genericArrayType = (GenericArrayType) genericType;
+            Type genericComponentType = genericArrayType.getGenericComponentType();
+            if (genericComponentType instanceof Class) {
+                return resolveServiceInterfaceBasedOnClassType((Class<?>) genericComponentType);
+            }
+
+            if (genericComponentType instanceof ParameterizedType) {
+                return resolveServiceInterfaceBasedOnParameterizedType((ParameterizedType) genericComponentType);
+            }
+        }
+
+        if (genericType instanceof ParameterizedType) {
+            return resolveServiceInterfaceBasedOnParameterizedType((ParameterizedType) genericType);
+        }
+
+        throw new MetadataValidationException("Could not determine the OSGi service interface based on type "
+                + genericType + " in class " + clazz.getName());
+
+    }
+
+    private Class<?> resolveServiceInterfaceBasedOnParameterizedType(ParameterizedType parameterizedType) {
+        Type rawType = parameterizedType.getRawType();
+        if (rawType instanceof Class) {
+            Class<?> classType = (Class<?>) rawType;
+            if (!classType.equals(ServiceHolder.class)) {
+                return classType;
+            }
+
+            Type serviceInterfaceType = parameterizedType.getActualTypeArguments()[0];
+            if (serviceInterfaceType instanceof WildcardType) {
+                return null;
+            }
+
+            if (serviceInterfaceType instanceof Class) {
+                return (Class<?>) serviceInterfaceType;
+            }
+
+            if (serviceInterfaceType instanceof ParameterizedType) {
+                Type raw = ((ParameterizedType) serviceInterfaceType).getRawType();
+                if (raw instanceof Class) {
+                    return (Class<?>) raw;
+                }
+            }
+
+        }
+        throw new MetadataValidationException("Could not determine the OSGi service interface based on type "
+                + parameterizedType + " in class " + clazz.getName());
+    }
+
+    private Class<?> resolveServiceInterfaceBasedOnClassType(Class<?> classType) {
+        if (classType.equals(ServiceHolder.class)) {
+            // TODO maybe an exception should be thrown as ServiceHolder should not be used without generics
+            return null;
+        } else {
+            return classType;
+        }
     }
 
     private <V, B extends AttributeMetadataBuilder<V, B>> void fillAttributeMetaBuilder(
