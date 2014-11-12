@@ -510,7 +510,7 @@ public class MetadataBuilder<C> {
             }
         } catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException
                 | InvocationTargetException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Error during processing class " + clazz.getName(), e);
         }
 
     }
