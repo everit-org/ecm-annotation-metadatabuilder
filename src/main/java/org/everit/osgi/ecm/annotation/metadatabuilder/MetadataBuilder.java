@@ -28,6 +28,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -99,6 +100,8 @@ public class MetadataBuilder<C> {
 
     private static final Set<Class<?>> ANNOTATION_CONTAINER_TYPES;
 
+    private static final Map<Class<?>, Class<?>> PRIMITIVE_BOXING_TYPE_MAPPING;
+
     static {
         ANNOTATION_CONTAINER_TYPES = new HashSet<Class<?>>();
         ANNOTATION_CONTAINER_TYPES.add(ServiceRefs.class);
@@ -113,30 +116,22 @@ public class MetadataBuilder<C> {
         ANNOTATION_CONTAINER_TYPES.add(PasswordAttributes.class);
         ANNOTATION_CONTAINER_TYPES.add(ShortAttributes.class);
         ANNOTATION_CONTAINER_TYPES.add(StringAttributes.class);
+
+        PRIMITIVE_BOXING_TYPE_MAPPING = new HashMap<>();
+        PRIMITIVE_BOXING_TYPE_MAPPING.put(boolean.class, Boolean.class);
+        PRIMITIVE_BOXING_TYPE_MAPPING.put(byte.class, Byte.class);
+        PRIMITIVE_BOXING_TYPE_MAPPING.put(char.class, Character.class);
+        PRIMITIVE_BOXING_TYPE_MAPPING.put(double.class, Double.class);
+        PRIMITIVE_BOXING_TYPE_MAPPING.put(float.class, Float.class);
+        PRIMITIVE_BOXING_TYPE_MAPPING.put(int.class, Integer.class);
+        PRIMITIVE_BOXING_TYPE_MAPPING.put(long.class, Long.class);
+        PRIMITIVE_BOXING_TYPE_MAPPING.put(short.class, Short.class);
+
     }
 
     public static <C> ComponentMetadata buildComponentMetadata(Class<C> clazz) {
         MetadataBuilder<C> metadataBuilder = new MetadataBuilder<C>(clazz);
         return metadataBuilder.build();
-    }
-
-    private static <O> O[] convertPrimitiveArray(Object primitiveArray, Class<O> targetType) {
-        int length = Array.getLength(primitiveArray);
-
-        if (length == 0) {
-            return null;
-        }
-
-        @SuppressWarnings("unchecked")
-        O[] result = (O[]) Array.newInstance(targetType, length);
-
-        for (int i = 0; i < length; i++) {
-            @SuppressWarnings("unchecked")
-            O element = (O) Array.get(primitiveArray, i);
-            result[i] = element;
-        }
-
-        return result;
     }
 
     private LinkedHashMap<String, AttributeMetadata<?>> attributes =
@@ -293,10 +288,10 @@ public class MetadataBuilder<C> {
         return null;
     }
 
-    private <V, B extends AttributeMetadataBuilder<V, B>> void fillAttributeMetaBuilder(
+    private <V_ARRAY, B extends AttributeMetadataBuilder<V_ARRAY, B>> void fillAttributeMetaBuilder(
             Member member,
             Annotation annotation,
-            AttributeMetadataBuilder<V, B> builder) {
+            AttributeMetadataBuilder<V_ARRAY, B> builder) {
 
         Boolean dynamic = callMethodOfAnnotation(annotation, "dynamic");
         Boolean optional = callMethodOfAnnotation(annotation, "optional");
@@ -306,7 +301,13 @@ public class MetadataBuilder<C> {
         String description = callMethodOfAnnotation(annotation, "description");
 
         Object defaultValueArray = callMethodOfAnnotation(annotation, "defaultValue");
-        V[] convertedDefaultValues = convertPrimitiveArray(defaultValueArray, builder.getValueType());
+
+        @SuppressWarnings("unchecked")
+        V_ARRAY typedDefaultValueArray = (V_ARRAY) defaultValueArray;
+
+        if (!multiple && Array.getLength(typedDefaultValueArray) == 0) {
+            typedDefaultValueArray = null;
+        }
 
         builder.withDynamic(dynamic)
                 .withOptional(optional)
@@ -314,7 +315,7 @@ public class MetadataBuilder<C> {
                 .withMetatype(metatype)
                 .withLabel(makeStringNullIfEmpty(label))
                 .withDescription(makeStringNullIfEmpty(description))
-                .withDefaultValue(convertedDefaultValues);
+                .withDefaultValue(typedDefaultValueArray);
     }
 
     private <V, B extends PropertyAttributeMetadataBuilder<V, B>> void fillPropertyAttributeBuilder(
@@ -383,38 +384,49 @@ public class MetadataBuilder<C> {
             builder.withSetter(new MethodDescriptor((Method) member));
         }
 
+        if (builder.getDefaultValue() == null
+                && builder.getReferenceConfigurationType() == ReferenceConfigurationType.FILTER
+                && !builder.isOptional()) {
+            builder.withDefaultValue(new String[] { null });
+        }
+
         builder.withReferenceId(referenceId)
                 .withAttributeId(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "attributeId")))
                 .withReferenceConfigurationType(convertedConfigurationType);
     }
 
-    private <V, B extends SelectablePropertyAttributeMetadataBuilder<V, B>> void fillSelectablePropertyAttributeBuilder(
+    private <V_ARRAY, B extends SelectablePropertyAttributeMetadataBuilder<V_ARRAY, B>> void fillSelectablePropertyAttributeBuilder(
             Member member, Annotation annotation,
-            SelectablePropertyAttributeMetadataBuilder<V, B> builder) {
+            SelectablePropertyAttributeMetadataBuilder<V_ARRAY, B> builder) {
         fillPropertyAttributeBuilder(member, annotation, builder);
 
         Object optionAnnotationArray = callMethodOfAnnotation(annotation, "options");
         int length = Array.getLength(optionAnnotationArray);
         if (length == 0) {
-            builder.withOptions(null);
+            builder.withOptions(null, null);
             return;
         }
 
-        Map<V, String> options = new LinkedHashMap<V, String>();
+        String[] labels = new String[length];
+
+        @SuppressWarnings("unchecked")
+        V_ARRAY values = (V_ARRAY) Array.newInstance(builder.getValueType(), length);
+
         for (int i = 0; i < length; i++) {
             Annotation optionAnnotation = (Annotation) Array.get(optionAnnotationArray, i);
 
             String label = callMethodOfAnnotation(optionAnnotation, "label");
-            V value = callMethodOfAnnotation(optionAnnotation, "value");
+            Object value = callMethodOfAnnotation(optionAnnotation, "value");
 
             label = makeStringNullIfEmpty(label);
             if (label == null) {
                 label = value.toString();
             }
 
-            options.put(value, label);
+            labels[i] = label;
+            Array.set(values, i, value);
         }
-        builder.withOptions(options);
+        builder.withOptions(labels, values);
     }
 
     private MethodDescriptor findMethodWithAnnotation(Class<? extends Annotation> annotationClass) {
@@ -755,23 +767,20 @@ public class MetadataBuilder<C> {
             Annotation annotation, PropertyAttributeMetadataBuilder<V, B> builder, String setterName) {
 
         List<MethodDescriptor> potentialDescriptors = new ArrayList<MethodDescriptor>();
-        Class<?> primitiveType = builder.getPrimitiveType();
+        Class<?> attributeType = builder.getValueType();
         boolean multiple = builder.isMultiple();
 
         if (multiple) {
-            Class<?> multipleType = primitiveType;
-            if (primitiveType == null) {
-                multipleType = builder.getValueType();
-            }
-            String parameterTypeName = multipleType.getCanonicalName() + "[]";
+            String parameterTypeName = attributeType.getCanonicalName() + "[]";
             potentialDescriptors.add(new MethodDescriptor(setterName, new String[] { parameterTypeName }));
         } else {
-            if (primitiveType != null) {
+            if (attributeType.isPrimitive()) {
+                Class<?> boxingType = PRIMITIVE_BOXING_TYPE_MAPPING.get(attributeType);
                 potentialDescriptors.add(new MethodDescriptor(setterName,
-                        new String[] { primitiveType.getSimpleName() }));
+                        new String[] { boxingType.getCanonicalName() }));
             }
-            potentialDescriptors.add(new MethodDescriptor(setterName, new String[] { builder.getValueType()
-                    .getCanonicalName() }));
+            potentialDescriptors
+                    .add(new MethodDescriptor(setterName, new String[] { attributeType.getCanonicalName() }));
 
         }
 
