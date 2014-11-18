@@ -384,12 +384,6 @@ public class MetadataBuilder<C> {
             builder.withSetter(new MethodDescriptor((Method) member));
         }
 
-        if (builder.getDefaultValue() == null
-                && builder.getReferenceConfigurationType() == ReferenceConfigurationType.FILTER
-                && !builder.isOptional()) {
-            builder.withDefaultValue(new String[] { null });
-        }
-
         builder.withReferenceId(referenceId)
                 .withAttributeId(makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "attributeId")))
                 .withReferenceConfigurationType(convertedConfigurationType);
