@@ -18,13 +18,13 @@ package org.everit.osgi.ecm.annotation.metadatabuilder;
 
 public class ComponentAnnotationMissingException extends RuntimeException {
 
-    /**
+  /**
      *
      */
-    private static final long serialVersionUID = -1780793818219338114L;
+  private static final long serialVersionUID = -1780793818219338114L;
 
-    public ComponentAnnotationMissingException(String message) {
-        super(message);
-    }
+  public ComponentAnnotationMissingException(String message) {
+    super(message);
+  }
 
 }

@@ -18,13 +18,13 @@ package org.everit.osgi.ecm.annotation.metadatabuilder;
 
 public class InconsistentAnnotationException extends RuntimeException {
 
-    /**
-     * .
-     */
-    private static final long serialVersionUID = 8835062566167923386L;
+  /**
+   * .
+   */
+  private static final long serialVersionUID = 8835062566167923386L;
 
-    public InconsistentAnnotationException(String message) {
-        super(message);
-    }
+  public InconsistentAnnotationException(String message) {
+    super(message);
+  }
 
 }
