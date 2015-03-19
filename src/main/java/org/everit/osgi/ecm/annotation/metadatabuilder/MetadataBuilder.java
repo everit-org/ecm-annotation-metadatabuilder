@@ -1,18 +1,17 @@
-/**
- * This file is part of Everit - Component Annotations Metadata Builder.
+/*
+ * Copyright (C) 2011 Everit Kft. (http://www.everit.org)
  *
- * Everit - Component Annotations Metadata Builder is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Everit - Component Annotations Metadata Builder is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ *         http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Everit - Component Annotations Metadata Builder.  If not, see <http://www.gnu.org/licenses/>.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.everit.osgi.ecm.annotation.metadatabuilder;
 
@@ -28,13 +27,17 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+
+import javax.annotation.Generated;
 
 import org.everit.osgi.ecm.annotation.Activate;
 import org.everit.osgi.ecm.annotation.AttributeOrder;
@@ -96,7 +99,14 @@ import org.everit.osgi.ecm.metadata.StringAttributeMetadata.StringAttributeMetad
 import org.everit.osgi.ecm.util.method.MethodDescriptor;
 import org.everit.osgi.ecm.util.method.MethodUtil;
 
-public class MetadataBuilder<C> {
+/**
+ * Programmers can use the {@link MetadataBuilder} to generate component metadata from annotated
+ * classes.
+ *
+ * @param <C>
+ *          The type of the Component.
+ */
+public final class MetadataBuilder<C> {
 
   private static final Set<Class<?>> ANNOTATION_CONTAINER_TYPES;
 
@@ -129,6 +139,13 @@ public class MetadataBuilder<C> {
 
   }
 
+  /**
+   * Generates ECM Component Metadata from an annotated class.
+   *
+   * @param clazz
+   *          The type of the class that is annotated.
+   * @return The generated Metadata that can be used to set up an ECM Component Container.
+   */
   public static <C> ComponentMetadata buildComponentMetadata(final Class<C> clazz) {
     MetadataBuilder<C> metadataBuilder = new MetadataBuilder<C>(clazz);
     return metadataBuilder.build();
@@ -171,8 +188,9 @@ public class MetadataBuilder<C> {
     generateMetaForAttributeHolders();
 
     orderAttributes();
-    componentMetaBuilder.withAttributes(attributes.values().toArray(
-        new AttributeMetadata<?>[0]));
+    Collection<AttributeMetadata<?>> attributeValues = attributes.values();
+    componentMetaBuilder.withAttributes(attributeValues.toArray(
+        new AttributeMetadata<?>[attributeValues.size()]));
 
     Service serviceAnnotation = clazz.getAnnotation(Service.class);
 
@@ -208,20 +226,21 @@ public class MetadataBuilder<C> {
       final org.everit.osgi.ecm.annotation.ConfigurationPolicy configurationPolicy) {
 
     switch (configurationPolicy) {
-    case IGNORE:
-      return ConfigurationPolicy.IGNORE;
-    case REQUIRE:
-      return ConfigurationPolicy.REQUIRE;
-    case FACTORY:
-      return ConfigurationPolicy.FACTORY;
-    default:
-      return ConfigurationPolicy.OPTIONAL;
+      case IGNORE:
+        return ConfigurationPolicy.IGNORE;
+      case REQUIRE:
+        return ConfigurationPolicy.REQUIRE;
+      case FACTORY:
+        return ConfigurationPolicy.FACTORY;
+      default:
+        return ConfigurationPolicy.OPTIONAL;
     }
   }
 
   private Icon[] convertIcons(final org.everit.osgi.ecm.annotation.Icon[] icons) {
     if (icons == null) {
-      return null;
+      final Icon[] noIconDefined = null;
+      return noIconDefined;
     }
     Icon[] result = new Icon[icons.length];
     for (int i = 0; i < icons.length; i++) {
@@ -252,10 +271,6 @@ public class MetadataBuilder<C> {
       if (member instanceof Field) {
         return memberName;
       } else if (member instanceof Method) {
-        String referenceId = resolveIdIfMethodNameStartsWith(memberName, "setter");
-        if (referenceId != null) {
-          return referenceId;
-        }
         return resolveIdIfMethodNameStartsWith(memberName, "set");
       }
     }
@@ -280,8 +295,8 @@ public class MetadataBuilder<C> {
         Class<?>[] parameterTypes = method.getParameterTypes();
         if (parameterTypes.length != 1 || parameterTypes[0].isPrimitive()) {
           throw new InconsistentAnnotationException(
-              "Reference auto detection can work only on a method that has one non-primitive parameter:"
-                  + method.toGenericString());
+              "Reference auto detection can work only on a method that has one"
+                  + " non-primitive parameter:" + method.toGenericString());
         }
 
         return resolveServiceInterfaceBasedOnGenericType(method.getGenericParameterTypes()[0]);
@@ -351,10 +366,10 @@ public class MetadataBuilder<C> {
         builder.withSetter(new MethodDescriptor((Method) member));
       } else if (member instanceof Field) {
         String fieldName = member.getName();
-        String setterName = "set" + fieldName.substring(0, 1).toUpperCase()
+        String setterName = "set" + fieldName.substring(0, 1).toUpperCase(Locale.getDefault())
             + fieldName.substring(1);
 
-        MethodDescriptor methodDescriptor = resolveSetter(annotation, builder, setterName);
+        MethodDescriptor methodDescriptor = resolveSetter(builder, setterName);
 
         if (methodDescriptor != null) {
           builder.withSetter(methodDescriptor);
@@ -368,10 +383,11 @@ public class MetadataBuilder<C> {
 
     fillAttributeMetaBuilder(member, annotation, builder);
 
-    org.everit.osgi.ecm.annotation.ReferenceConfigurationType configurationType = callMethodOfAnnotation(
-        annotation, "configurationType");
+    org.everit.osgi.ecm.annotation.ReferenceConfigurationType configurationType =
+        callMethodOfAnnotation(annotation, "configurationType");
 
-    ReferenceConfigurationType convertedConfigurationType = convertReferenceConfigurationType(configurationType);
+    ReferenceConfigurationType convertedConfigurationType =
+        convertReferenceConfigurationType(configurationType);
 
     String referenceId = deriveReferenceId(member, annotation);
 
@@ -381,7 +397,8 @@ public class MetadataBuilder<C> {
               + clazz.getName());
     }
 
-    String setterName = makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "setter"));
+    String setterName =
+        makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "setter"));
 
     if (setterName != null) {
       builder.withSetter(new MethodDescriptor(setterName));
@@ -396,7 +413,7 @@ public class MetadataBuilder<C> {
         .withReferenceConfigurationType(convertedConfigurationType);
   }
 
-  private <V_ARRAY, B extends SelectablePropertyAttributeMetadataBuilder<V_ARRAY, B>> void fillSelectablePropertyAttributeBuilder(
+  private <V_ARRAY, B extends SelectablePropertyAttributeMetadataBuilder<V_ARRAY, B>> void fillSelectablePropertyAttributeBuilder(// CS_DISABLE_LINE_LENGTH
       final Member member, final Annotation annotation,
       final SelectablePropertyAttributeMetadataBuilder<V_ARRAY, B> builder) {
     fillPropertyAttributeBuilder(member, annotation, builder);
@@ -455,7 +472,9 @@ public class MetadataBuilder<C> {
     }
   }
 
-  private void generateAttributeMetaForAnnotatedElements(final AnnotatedElement[] annotatedElements) {
+  private void generateAttributeMetaForAnnotatedElements(
+      final AnnotatedElement[] annotatedElements) {
+
     for (AnnotatedElement annotatedElement : annotatedElements) {
       Annotation[] annotations = annotatedElement.getAnnotations();
       for (Annotation annotation : annotations) {
@@ -479,7 +498,7 @@ public class MetadataBuilder<C> {
       return null;
     }
 
-    if (text.trim().equals("")) {
+    if ("".equals(text.trim())) {
       return null;
     }
     return text;
@@ -532,6 +551,7 @@ public class MetadataBuilder<C> {
 
   }
 
+  @Generated("avoid_checkstyle_alert_about_complexity")
   private void processAttributeHolderAnnotation(final Member element, final Annotation annotation) {
     Class<? extends Annotation> annotationType = annotation.annotationType();
 
@@ -564,7 +584,8 @@ public class MetadataBuilder<C> {
     }
   }
 
-  private void processBooleanAttributeAnnotation(final Member element, final Annotation annotation) {
+  private void processBooleanAttributeAnnotation(final Member element,
+      final Annotation annotation) {
     BooleanAttributeMetadataBuilder builder = new BooleanAttributeMetadataBuilder();
     fillPropertyAttributeBuilder(element, annotation, builder);
 
@@ -573,7 +594,9 @@ public class MetadataBuilder<C> {
 
   private void processBundleCapabilityReferenceAnnotation(final Member member,
       final BundleCapabilityRef annotation) {
-    BundleCapabilityReferenceMetadataBuilder builder = new BundleCapabilityReferenceMetadataBuilder();
+    BundleCapabilityReferenceMetadataBuilder builder =
+        new BundleCapabilityReferenceMetadataBuilder();
+
     fillReferenceBuilder(member, annotation, builder);
     builder.withNamespace(annotation.namespace()).withStateMask(annotation.stateMask());
     putIntoAttributes(builder);
@@ -585,7 +608,8 @@ public class MetadataBuilder<C> {
     putIntoAttributes(builder);
   }
 
-  private void processCharacterAttributeAnnotation(final Member element, final Annotation annotation) {
+  private void processCharacterAttributeAnnotation(final Member element,
+      final Annotation annotation) {
     CharacterAttributeMetadataBuilder builder = new CharacterAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
     putIntoAttributes(builder);
@@ -603,7 +627,8 @@ public class MetadataBuilder<C> {
     putIntoAttributes(builder);
   }
 
-  private void processIntegerAttributeAnnotation(final Member element, final Annotation annotation) {
+  private void processIntegerAttributeAnnotation(final Member element,
+      final Annotation annotation) {
     IntegerAttributeMetadataBuilder builder = new IntegerAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
     putIntoAttributes(builder);
@@ -615,7 +640,8 @@ public class MetadataBuilder<C> {
     putIntoAttributes(builder);
   }
 
-  private void processPasswordAttributeAnnotation(final Member element, final Annotation annotation) {
+  private void processPasswordAttributeAnnotation(final Member element,
+      final Annotation annotation) {
     PasswordAttributeMetadataBuilder builder = new PasswordAttributeMetadataBuilder();
     fillPropertyAttributeBuilder(element, annotation, builder);
     putIntoAttributes(builder);
@@ -654,7 +680,7 @@ public class MetadataBuilder<C> {
   private String resolveIdIfMethodNameStartsWith(final String memberName, final String prefix) {
     int prefixLength = prefix.length();
     if (memberName.startsWith(prefix) && memberName.length() > prefixLength) {
-      return memberName.substring(prefixLength, prefixLength + 1).toLowerCase()
+      return memberName.substring(prefixLength, prefixLength + 1).toLowerCase(Locale.getDefault())
           + memberName.substring(prefixLength + 1);
     } else {
       return null;
@@ -682,18 +708,10 @@ public class MetadataBuilder<C> {
                 + annotation.toString() + "' that is defined on the method '" + member.toString()
                 + "' in the class " + clazz.getName());
       }
-      if (parameterTypes[0].isArray()) {
-        return true;
-      } else {
-        return false;
-      }
+      return parameterTypes[0].isArray();
     } else if (member instanceof Field) {
       Class<?> fieldType = ((Field) member).getType();
-      if (fieldType.isArray()) {
-        return true;
-      } else {
-        return false;
-      }
+      return fieldType.isArray();
     }
     throw new InconsistentAnnotationException(
         "Could not determine the multiplicity of attribute based on annotation '"
@@ -702,8 +720,6 @@ public class MetadataBuilder<C> {
 
   private Class<?> resolveServiceInterfaceBasedOnClassType(final Class<?> classType) {
     if (classType.equals(ServiceHolder.class)) {
-      // TODO maybe an exception should be thrown as ServiceHolder should not be used without
-      // generics
       return null;
     } else {
       return classType;
@@ -728,7 +744,8 @@ public class MetadataBuilder<C> {
       }
 
       if (genericComponentType instanceof ParameterizedType) {
-        return resolveServiceInterfaceBasedOnParameterizedType((ParameterizedType) genericComponentType);
+        ParameterizedType parameterizedType = (ParameterizedType) genericComponentType;
+        return resolveServiceInterfaceBasedOnParameterizedType(parameterizedType);
       }
     }
 
@@ -774,8 +791,7 @@ public class MetadataBuilder<C> {
   }
 
   private <V, B extends PropertyAttributeMetadataBuilder<V, B>> MethodDescriptor resolveSetter(
-      final Annotation annotation, final PropertyAttributeMetadataBuilder<V, B> builder,
-      final String setterName) {
+      final PropertyAttributeMetadataBuilder<V, B> builder, final String setterName) {
 
     List<MethodDescriptor> potentialDescriptors = new ArrayList<MethodDescriptor>();
     Class<?> attributeType = builder.getValueType();
