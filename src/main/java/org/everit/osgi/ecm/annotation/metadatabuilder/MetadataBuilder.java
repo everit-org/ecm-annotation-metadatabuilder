@@ -15,6 +15,7 @@
  */
 package org.everit.osgi.ecm.annotation.metadatabuilder;
 
+import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Array;
@@ -27,20 +28,19 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 import javax.annotation.Generated;
 
 import org.everit.osgi.ecm.annotation.Activate;
-import org.everit.osgi.ecm.annotation.AttributeOrder;
 import org.everit.osgi.ecm.annotation.AutoDetect;
 import org.everit.osgi.ecm.annotation.BundleCapabilityRef;
 import org.everit.osgi.ecm.annotation.BundleCapabilityRefs;
@@ -108,7 +108,33 @@ import org.everit.osgi.ecm.util.method.MethodUtil;
  */
 public final class MetadataBuilder<C> {
 
+  /**
+   * Compares {@link AttributeMetadata} classes based on their priority and than their names.
+   */
+  private static final class AttributeMetadataComparator
+      implements Comparator<AttributeMetadata<?>>, Serializable {
+
+    private static final long serialVersionUID = -7796104393729198249L;
+
+    @Override
+    public int compare(final AttributeMetadata<?> attr1, final AttributeMetadata<?> attr2) {
+      if (attr1 == null) {
+        return -1;
+      }
+      if (attr2 == null) {
+        return 1;
+      }
+
+      float attr1Priority = attr1.getPriority();
+      float attr2Priority = attr2.getPriority();
+      return Float.compare(attr1Priority, attr2Priority);
+    }
+  }
+
   private static final Set<Class<?>> ANNOTATION_CONTAINER_TYPES;
+
+  private static final AttributeMetadataComparator ATTRIBUTE_METADATA_COMPARATOR =
+      new AttributeMetadataComparator();
 
   private static final Map<Class<?>, Class<?>> PRIMITIVE_BOXING_TYPE_MAPPING;
 
@@ -151,8 +177,8 @@ public final class MetadataBuilder<C> {
     return metadataBuilder.build();
   }
 
-  private LinkedHashMap<String, AttributeMetadata<?>> attributes =
-      new LinkedHashMap<String, AttributeMetadata<?>>();
+  private NavigableSet<AttributeMetadata<?>> attributes =
+      new TreeSet<>(ATTRIBUTE_METADATA_COMPARATOR);
 
   private Class<C> clazz;
 
@@ -187,10 +213,8 @@ public final class MetadataBuilder<C> {
 
     generateMetaForAttributeHolders();
 
-    orderAttributes();
-    Collection<AttributeMetadata<?>> attributeValues = attributes.values();
-    componentMetaBuilder.withAttributes(attributeValues.toArray(
-        new AttributeMetadata<?>[attributeValues.size()]));
+    componentMetaBuilder.withAttributes(attributes.toArray(
+        new AttributeMetadata<?>[attributes.size()]));
 
     Service serviceAnnotation = clazz.getAnnotation(Service.class);
 
@@ -293,7 +317,7 @@ public final class MetadataBuilder<C> {
       } else if (member instanceof Method) {
         Method method = ((Method) member);
         Class<?>[] parameterTypes = method.getParameterTypes();
-        if (parameterTypes.length != 1 || parameterTypes[0].isPrimitive()) {
+        if ((parameterTypes.length != 1) || parameterTypes[0].isPrimitive()) {
           throw new InconsistentAnnotationException(
               "Reference auto detection can work only on a method that has one"
                   + " non-primitive parameter:" + method.toGenericString());
@@ -317,13 +341,14 @@ public final class MetadataBuilder<C> {
     Boolean metatype = callMethodOfAnnotation(annotation, "metatype");
     String label = callMethodOfAnnotation(annotation, "label");
     String description = callMethodOfAnnotation(annotation, "description");
+    float priority = callMethodOfAnnotation(annotation, "priority");
 
     Object defaultValueArray = callMethodOfAnnotation(annotation, "defaultValue");
 
     @SuppressWarnings("unchecked")
     V_ARRAY typedDefaultValueArray = (V_ARRAY) defaultValueArray;
 
-    if (!multiple && Array.getLength(typedDefaultValueArray) == 0) {
+    if (!multiple && (Array.getLength(typedDefaultValueArray) == 0)) {
       typedDefaultValueArray = null;
     }
 
@@ -333,6 +358,7 @@ public final class MetadataBuilder<C> {
         .withMetatype(metatype)
         .withLabel(makeStringNullIfEmpty(label))
         .withDescription(makeStringNullIfEmpty(description))
+        .withPriority(priority)
         .withDefaultValue(typedDefaultValueArray);
   }
 
@@ -344,7 +370,7 @@ public final class MetadataBuilder<C> {
     String attributeId = callMethodOfAnnotation(annotation, "attributeId");
     attributeId = makeStringNullIfEmpty(attributeId);
 
-    if (attributeId == null && member != null) {
+    if ((attributeId == null) && (member != null)) {
       String memberName = member.getName();
       if (member instanceof Field) {
         attributeId = memberName;
@@ -504,37 +530,6 @@ public final class MetadataBuilder<C> {
     return text;
   }
 
-  private void orderAttributes() {
-    AttributeOrder attributeOrder = clazz.getAnnotation(AttributeOrder.class);
-    if (attributeOrder == null) {
-      return;
-    }
-
-    String[] orderArray = attributeOrder.value();
-    if (orderArray.length == 0) {
-      return;
-    }
-
-    LinkedHashMap<String, AttributeMetadata<?>> orderedAttributes =
-        new LinkedHashMap<String, AttributeMetadata<?>>();
-    for (String attributeId : orderArray) {
-      AttributeMetadata<?> attributeMetadata = attributes.remove(attributeId);
-      if (attributeMetadata == null) {
-        throw new InconsistentAnnotationException("Attribute with id '" + attributeId
-            + "' that is defined in AttributeOrder on the class '" + clazz.getName()
-            + "' does not exist.");
-      }
-      orderedAttributes.put(attributeId, attributeMetadata);
-    }
-
-    Set<Entry<String, AttributeMetadata<?>>> attributeEntries = attributes.entrySet();
-    for (Entry<String, AttributeMetadata<?>> attributeEntry : attributeEntries) {
-      orderedAttributes.put(attributeEntry.getKey(), attributeEntry.getValue());
-    }
-
-    this.attributes = orderedAttributes;
-  }
-
   private void processAnnotationContainer(final Annotation annotationContainer) {
 
     try {
@@ -668,9 +663,8 @@ public final class MetadataBuilder<C> {
 
   private void putIntoAttributes(final AttributeMetadataBuilder<?, ?> builder) {
     AttributeMetadata<?> attributeMetadata = builder.build();
-    AttributeMetadata<?> existing = attributes.put(attributeMetadata.getAttributeId(),
-        builder.build());
-    if (existing != null) {
+    boolean exists = attributes.add(attributeMetadata);
+    if (exists) {
       throw new MetadataValidationException("Duplicate attribute id '"
           + attributeMetadata.getAttributeId()
           + "' found in class '" + clazz.getName() + "'.");
@@ -679,7 +673,7 @@ public final class MetadataBuilder<C> {
 
   private String resolveIdIfMethodNameStartsWith(final String memberName, final String prefix) {
     int prefixLength = prefix.length();
-    if (memberName.startsWith(prefix) && memberName.length() > prefixLength) {
+    if (memberName.startsWith(prefix) && (memberName.length() > prefixLength)) {
       return memberName.substring(prefixLength, prefixLength + 1).toLowerCase(Locale.getDefault())
           + memberName.substring(prefixLength + 1);
     } else {
