@@ -127,7 +127,14 @@ public final class MetadataBuilder<C> {
 
       float attr1Priority = attr1.getPriority();
       float attr2Priority = attr2.getPriority();
-      return Float.compare(attr1Priority, attr2Priority);
+      int compare = Float.compare(attr1Priority, attr2Priority);
+      if (compare != 0) {
+        return compare;
+      }
+
+      String attr1Id = attr1.getAttributeId();
+      String attr2Id = attr2.getAttributeId();
+      return attr1Id.compareTo(attr2Id);
     }
   }
 
@@ -341,7 +348,15 @@ public final class MetadataBuilder<C> {
     Boolean metatype = callMethodOfAnnotation(annotation, "metatype");
     String label = callMethodOfAnnotation(annotation, "label");
     String description = callMethodOfAnnotation(annotation, "description");
-    float priority = callMethodOfAnnotation(annotation, "priority");
+
+    Class<? extends Annotation> annotationType = annotation.annotationType();
+    float priority = 0;
+    if (annotationType.equals(ServiceRef.class)
+        || annotationType.equals(BundleCapabilityRef.class)) {
+      priority = callMethodOfAnnotation(annotation, "attributePriority");
+    } else {
+      priority = callMethodOfAnnotation(annotation, "priority");
+    }
 
     Object defaultValueArray = callMethodOfAnnotation(annotation, "defaultValue");
 
@@ -664,7 +679,7 @@ public final class MetadataBuilder<C> {
   private void putIntoAttributes(final AttributeMetadataBuilder<?, ?> builder) {
     AttributeMetadata<?> attributeMetadata = builder.build();
     boolean exists = attributes.add(attributeMetadata);
-    if (exists) {
+    if (!exists) {
       throw new MetadataValidationException("Duplicate attribute id '"
           + attributeMetadata.getAttributeId()
           + "' found in class '" + clazz.getName() + "'.");
