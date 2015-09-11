@@ -27,11 +27,16 @@ import org.everit.osgi.ecm.annotation.ServiceRefs;
 import org.everit.osgi.ecm.annotation.Update;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttribute;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttributes;
+import org.everit.osgi.ecm.annotation.attribute.FloatAttribute;
 import org.everit.osgi.ecm.annotation.attribute.StringAttribute;
+import org.everit.osgi.ecm.annotation.attribute.StringAttributes;
 
 @Component(configurationPolicy = ConfigurationPolicy.REQUIRE)
 @BooleanAttributes({
     @BooleanAttribute(attributeId = "childByteAttribute", priority = 8),
+})
+@StringAttributes({
+    @StringAttribute(attributeId = "parentStringAttribute")
 })
 @ServiceRefs({
     @ServiceRef(referenceId = "listService", setter = "setListService")
@@ -68,6 +73,13 @@ public class ChildTestComponent extends ParentTestComponent implements Supplier<
 
   public void setListService(final List<String> listService) {
     this.listService = listService;
+  }
+
+  @FloatAttribute
+  @Override
+  public void setParentFloatAttribute(final float parentFloatAttribute) {
+    // TODO Auto-generated method stub
+    super.setParentFloatAttribute(parentFloatAttribute);
   }
 
   @Update

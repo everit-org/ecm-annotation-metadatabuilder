@@ -178,8 +178,9 @@ public final class MetadataBuilder<C> {
     return metadataBuilder.build();
   }
 
-  private NavigableSet<AttributeMetadata<?>> attributes =
-      new TreeSet<>(ATTRIBUTE_METADATA_COMPARATOR);
+  private Map<String, Class<?>> attributeClasses = new HashMap<>();
+
+  private Map<String, AttributeMetadata<?>> attributes = new HashMap<>();
 
   private Class<C> originalClazz;
 
@@ -240,6 +241,8 @@ public final class MetadataBuilder<C> {
       generateMetaForAttributeHolders();
     }
 
+    NavigableSet<AttributeMetadata<?>> attributes = new TreeSet<>(ATTRIBUTE_METADATA_COMPARATOR);
+    attributes.addAll(this.attributes.values());
     componentMetaBuilder.withAttributes(attributes.toArray(
         new AttributeMetadata<?>[attributes.size()]));
 
@@ -621,8 +624,7 @@ public final class MetadataBuilder<C> {
       final Annotation annotation) {
     BooleanAttributeMetadataBuilder builder = new BooleanAttributeMetadataBuilder();
     fillPropertyAttributeBuilder(element, annotation, builder);
-
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processBundleCapabilityReferenceAnnotation(final Member member,
@@ -632,81 +634,88 @@ public final class MetadataBuilder<C> {
 
     fillReferenceBuilder(member, annotation, builder);
     builder.withNamespace(annotation.namespace()).withStateMask(annotation.stateMask());
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processByteAttributeAnnotation(final Member element, final Annotation annotation) {
     ByteAttributeMetadataBuilder builder = new ByteAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processCharacterAttributeAnnotation(final Member element,
       final Annotation annotation) {
     CharacterAttributeMetadataBuilder builder = new CharacterAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processDoubleAttributeAnnotation(final Member element, final Annotation annotation) {
     DoubleAttributeMetadataBuilder builder = new DoubleAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processFloatAttributeAnnotation(final Member element, final Annotation annotation) {
     FloatAttributeMetadataBuilder builder = new FloatAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processIntegerAttributeAnnotation(final Member element,
       final Annotation annotation) {
     IntegerAttributeMetadataBuilder builder = new IntegerAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processLongAttributeAnnotation(final Member element, final Annotation annotation) {
     LongAttributeMetadataBuilder builder = new LongAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processPasswordAttributeAnnotation(final Member element,
       final Annotation annotation) {
     PasswordAttributeMetadataBuilder builder = new PasswordAttributeMetadataBuilder();
     fillPropertyAttributeBuilder(element, annotation, builder);
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processServiceReferenceAnnotation(final Member member, final ServiceRef annotation) {
     ServiceReferenceMetadataBuilder builder = new ServiceReferenceMetadataBuilder();
     fillReferenceBuilder(member, annotation, builder);
     builder.withServiceInterface(deriveServiceInterface(member, annotation));
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processShortAttributeAnnotation(final Member element, final Annotation annotation) {
     ShortAttributeMetadataBuilder builder = new ShortAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
   private void processStringAttributeAnnotation(final Member element, final Annotation annotation) {
     StringAttributeMetadataBuilder builder = new StringAttributeMetadataBuilder();
     fillSelectablePropertyAttributeBuilder(element, annotation, builder);
-    putIntoAttributes(builder);
+    putIntoOrUpdateAttributes(builder);
   }
 
-  private void putIntoAttributes(final AttributeMetadataBuilder<?, ?> builder) {
+  private void putIntoOrUpdateAttributes(final AttributeMetadataBuilder<?, ?> builder) {
     AttributeMetadata<?> attributeMetadata = builder.build();
-    boolean exists = attributes.add(attributeMetadata);
-    if (!exists) {
+    String attributeId = attributeMetadata.getAttributeId();
+
+    AttributeMetadata<?> oldAttributeMetadata = attributes.get(attributeId);
+    if ((oldAttributeMetadata != null)
+        && attributeClasses.get(attributeId).equals(processedClazz)) {
       throw new MetadataValidationException("Duplicate attribute id '"
-          + attributeMetadata.getAttributeId()
+          + builder.getAttributeId()
           + "' found in class '" + processedClazz.getName() + "'.");
     }
+    // TODO check attributeMetadata type??
+
+    attributes.put(attributeId, attributeMetadata);
+    attributeClasses.put(attributeId, processedClazz);
   }
 
   private String resolveIdIfMethodNameStartsWith(final String memberName, final String prefix) {

@@ -24,6 +24,33 @@ import org.junit.Test;
 public class MetadataBuilderTest {
 
   @Test
+  public void testAttributeInheritance() {
+    ComponentMetadata buildComponentMetadata = MetadataBuilder
+        .buildComponentMetadata(ChildTestComponent.class);
+
+    AttributeMetadata<?>[] attributes = buildComponentMetadata.getAttributes();
+    Assert.assertEquals(8, attributes.length);
+    int i = 0;
+    Assert.assertEquals("childByteAttribute", attributes[i++].getAttributeId());
+    Assert.assertEquals("parentByteAttribute", attributes[i++].getAttributeId());
+    Assert.assertEquals("parentBooleanAttribute", attributes[i++].getAttributeId());
+    Assert.assertEquals("childStringAttribute", attributes[i++].getAttributeId());
+    Assert.assertEquals("listService.target", attributes[i++].getAttributeId());
+    Assert.assertEquals("mapService.target", attributes[i++].getAttributeId());
+    Assert.assertEquals("parentFloatAttribute", attributes[i++].getAttributeId());
+    Assert.assertEquals("parentStringAttribute", attributes[i++].getAttributeId());
+
+    MethodDescriptor activate = buildComponentMetadata.getActivate();
+    Assert.assertEquals("childActivate", activate.getMethodName());
+
+    MethodDescriptor update = buildComponentMetadata.getUpdate();
+    Assert.assertEquals("update", update.getMethodName());
+
+    MethodDescriptor deactivate = buildComponentMetadata.getDeactivate();
+    Assert.assertEquals("parentDeactivate", deactivate.getMethodName());
+  }
+
+  @Test
   public void testAttributePriorityOrder() {
     ComponentMetadata buildComponentMetadata = MetadataBuilder
         .buildComponentMetadata(TestPriorityComponent.class);
@@ -47,23 +74,5 @@ public class MetadataBuilderTest {
     Assert.assertEquals("byteAttribute4", attributes[i++].getAttributeId());
     Assert.assertEquals("stringAttributeDefaultPriority", attributes[i++].getAttributeId());
     Assert.assertEquals("stringAttributeAfterDefaultPriority", attributes[i++].getAttributeId());
-  }
-
-  @Test
-  public void testValami() {
-    ComponentMetadata buildComponentMetadata = MetadataBuilder
-        .buildComponentMetadata(ChildTestComponent.class);
-
-    AttributeMetadata<?>[] attributes = buildComponentMetadata.getAttributes();
-    Assert.assertEquals(6, attributes.length);
-
-    MethodDescriptor activate = buildComponentMetadata.getActivate();
-    Assert.assertEquals("childActivate", activate.getMethodName());
-
-    MethodDescriptor update = buildComponentMetadata.getUpdate();
-    Assert.assertEquals("update", update.getMethodName());
-
-    MethodDescriptor deactivate = buildComponentMetadata.getDeactivate();
-    Assert.assertEquals("parentDeactivate", deactivate.getMethodName());
   }
 }

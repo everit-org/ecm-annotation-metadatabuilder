@@ -23,6 +23,8 @@ import org.everit.osgi.ecm.annotation.Deactivate;
 import org.everit.osgi.ecm.annotation.ServiceRef;
 import org.everit.osgi.ecm.annotation.attribute.BooleanAttribute;
 import org.everit.osgi.ecm.annotation.attribute.ByteAttribute;
+import org.everit.osgi.ecm.annotation.attribute.FloatAttribute;
+import org.everit.osgi.ecm.annotation.attribute.StringAttribute;
 
 /**
  * Component to test initialization via attributes priority.
@@ -33,7 +35,11 @@ public class ParentTestComponent implements Function<String, String> {
 
   private boolean parentBooleanAttribute;
 
-  private byte parentByteAttribute1;
+  private byte parentByteAttribute;
+
+  private float parentFloatAttribute;
+
+  private String parentStringAttribute;
 
   @Override
   public String apply(final String t) {
@@ -44,8 +50,16 @@ public class ParentTestComponent implements Function<String, String> {
     return mapService;
   }
 
-  public byte getParentByteAttribute1() {
-    return parentByteAttribute1;
+  public byte getParentByteAttribute() {
+    return parentByteAttribute;
+  }
+
+  public float getParentFloatAttribute() {
+    return parentFloatAttribute;
+  }
+
+  public String getParentStringAttribute() {
+    return parentStringAttribute;
   }
 
   public boolean isParentBooleanAttribute() {
@@ -65,14 +79,25 @@ public class ParentTestComponent implements Function<String, String> {
     this.mapService = mapService;
   }
 
-  @BooleanAttribute(priority = 10)
-  public void setParentBooleanAttribute(final boolean booleanAttribute) {
-    parentBooleanAttribute = booleanAttribute;
+  @BooleanAttribute(priority = 10, defaultValue = true)
+  public void setParentBooleanAttribute(final boolean parentBooleanAttribute) {
+    this.parentBooleanAttribute = parentBooleanAttribute;
   }
 
   @ByteAttribute(priority = 9)
-  public void setParentByteAttribute1(final byte byteAttribute1) {
-    parentByteAttribute1 = byteAttribute1;
+  public void setParentByteAttribute(final byte parentByteAttribute) {
+    this.parentByteAttribute = parentByteAttribute;
+  }
+
+  @FloatAttribute(priority = 10, description = "description")
+  public void setParentFloatAttribute(final float parentFloatAttribute) {
+    this.parentFloatAttribute = parentFloatAttribute;
+  }
+
+  @StringAttribute(attributeId = "parentStringAttribute", priority = 10,
+      defaultValue = "Type here some numbers")
+  public void setParentStringAttribute(final String parentStringAttribute) {
+    this.parentStringAttribute = parentStringAttribute;
   }
 
 }
