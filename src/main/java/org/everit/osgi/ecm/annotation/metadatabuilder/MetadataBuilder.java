@@ -183,7 +183,9 @@ public final class MetadataBuilder<C> {
 
   private Class<C> originalClazz;
 
-  private Stack<Class<?>> superClasses = new Stack<>();;
+  private Class<?> processedClazz;
+
+  private Stack<Class<?>> superClasses = new Stack<>();
 
   private MetadataBuilder() {
   }
@@ -193,52 +195,53 @@ public final class MetadataBuilder<C> {
   }
 
   private ComponentMetadata build() {
-    superClasses.push(originalClazz);
-
-    Class<?> superclass = originalClazz.getSuperclass();
-    while ((superclass != null)
-        && superclass.getTypeName().equals(Object.class.getTypeName())) {
-      superClasses.push(superclass);
-      superclass = superclass.getSuperclass();
+    Component componentAnnotation = originalClazz.getAnnotation(Component.class);
+    if (componentAnnotation == null) {
+      throw new ComponentAnnotationMissingException("Component annotation is missing on type "
+          + originalClazz.toString());
     }
-
-    ComponentMetadataBuilder componentMetaBuilder = new ComponentMetadataBuilder();
-    Class<?> clazz = nextClass();
-    while ((clazz = nextClass()) != null) {
-      Component componentAnnotation = clazz.getAnnotation(Component.class);
-      if (componentAnnotation != null) {
-        componentMetaBuilder = componentMetaBuilder
-            .withComponentId(makeStringNullIfEmpty(componentAnnotation.componentId()))
-            .withConfigurationPid(makeStringNullIfEmpty(componentAnnotation.configurationPid()))
-            .withConfigurationPolicy(
-                convertConfigurationPolicy(componentAnnotation.configurationPolicy()))
-            .withDescription(makeStringNullIfEmpty(componentAnnotation.description()))
-            .withIcons(convertIcons(componentAnnotation.icons()))
-            .withMetatype(componentAnnotation.metatype())
-            .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
-            .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()))
-            .withType(clazz.getName());
-      } else {
-        componentMetaBuilder = componentMetaBuilder
-            .withActivate(findMethodWithAnnotation(clazz, Activate.class))
-            .withDeactivate(findMethodWithAnnotation(clazz, Deactivate.class))
-            .withUpdate(findMethodWithAnnotation(clazz, Update.class));
-      }
-    }
-
-    generateMetaForAttributeHolders();
-
-    componentMetaBuilder.withAttributes(attributes.toArray(
-        new AttributeMetadata<?>[attributes.size()]));
+    ComponentMetadataBuilder componentMetaBuilder = new ComponentMetadataBuilder()
+        .withType(originalClazz.getName())
+        .withComponentId(makeStringNullIfEmpty(componentAnnotation.componentId()))
+        .withConfigurationPid(makeStringNullIfEmpty(componentAnnotation.configurationPid()))
+        .withConfigurationPolicy(
+            convertConfigurationPolicy(componentAnnotation.configurationPolicy()))
+        .withDescription(makeStringNullIfEmpty(componentAnnotation.description()))
+        .withIcons(convertIcons(componentAnnotation.icons()))
+        .withMetatype(componentAnnotation.metatype())
+        .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
+        .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()));
 
     Service serviceAnnotation = originalClazz.getAnnotation(Service.class);
-
     if (serviceAnnotation != null) {
       ServiceMetadataBuilder serviceMetadataBuilder = new ServiceMetadataBuilder();
       Class<?>[] serviceInterfaces = serviceAnnotation.value();
       serviceMetadataBuilder.withClazzes(serviceInterfaces);
       componentMetaBuilder.withService(serviceMetadataBuilder.build());
     }
+
+    superClasses.push(originalClazz);
+    Class<?> superclass = originalClazz.getSuperclass();
+    while ((superclass != null)
+        && !superclass.getTypeName().equals(Object.class.getTypeName())) {
+      superClasses.push(superclass);
+      superclass = superclass.getSuperclass();
+    }
+
+    while ((processedClazz = nextClass()) != null) {
+      MethodDescriptor activateMethod = findMethodWithAnnotation(Activate.class);
+      MethodDescriptor deactivateMethod = findMethodWithAnnotation(Deactivate.class);
+      MethodDescriptor updateMethod = findMethodWithAnnotation(Update.class);
+      componentMetaBuilder = componentMetaBuilder
+          .withActivate(getOldOrNewValue(componentMetaBuilder.getActivate(), activateMethod))
+          .withDeactivate(getOldOrNewValue(componentMetaBuilder.getDeactivate(), deactivateMethod))
+          .withUpdate(getOldOrNewValue(componentMetaBuilder.getUpdate(), updateMethod));
+
+      generateMetaForAttributeHolders();
+    }
+
+    componentMetaBuilder.withAttributes(attributes.toArray(
+        new AttributeMetadata<?>[attributes.size()]));
 
     return componentMetaBuilder.build();
   }
@@ -332,7 +335,7 @@ public final class MetadataBuilder<C> {
       } else if (member instanceof Method) {
         Method method = ((Method) member);
         Class<?>[] parameterTypes = method.getParameterTypes();
-        if (parameterTypes.length != 1 || parameterTypes[0].isPrimitive()) {
+        if ((parameterTypes.length != 1) || parameterTypes[0].isPrimitive()) {
           throw new InconsistentAnnotationException(
               "Reference auto detection can work only on a method that has one"
                   + " non-primitive parameter:" + method.toGenericString());
@@ -371,7 +374,7 @@ public final class MetadataBuilder<C> {
     @SuppressWarnings("unchecked")
     V_ARRAY typedDefaultValueArray = (V_ARRAY) defaultValueArray;
 
-    if (!multiple && Array.getLength(typedDefaultValueArray) == 0) {
+    if (!multiple && (Array.getLength(typedDefaultValueArray) == 0)) {
       typedDefaultValueArray = null;
     }
 
@@ -393,7 +396,7 @@ public final class MetadataBuilder<C> {
     String attributeId = callMethodOfAnnotation(annotation, "attributeId");
     attributeId = makeStringNullIfEmpty(attributeId);
 
-    if (attributeId == null && member != null) {
+    if ((attributeId == null) && (member != null)) {
       String memberName = member.getName();
       if (member instanceof Field) {
         attributeId = memberName;
@@ -443,7 +446,7 @@ public final class MetadataBuilder<C> {
     if (referenceId == null) {
       throw new MetadataValidationException(
           "Reference id for one of the references could not be determined in class "
-              + originalClazz.getName());
+              + processedClazz.getName());
     }
 
     String setterName =
@@ -496,17 +499,17 @@ public final class MetadataBuilder<C> {
     builder.withOptions(labels, values);
   }
 
-  private MethodDescriptor findMethodWithAnnotation(final Class<?> clazz,
+  private MethodDescriptor findMethodWithAnnotation(
       final Class<? extends Annotation> annotationClass) {
     Method foundMethod = null;
-    Method[] methods = clazz.getDeclaredMethods();
+    Method[] methods = processedClazz.getDeclaredMethods();
     for (Method method : methods) {
       Annotation annotation = method.getAnnotation(annotationClass);
       if (annotation != null) {
         if (foundMethod != null) {
           throw new InconsistentAnnotationException("The '" + annotationClass.getName()
               + "' annotation is attached to more than one method in class '"
-              + clazz.getName()
+              + processedClazz.getName()
               + "'.");
         }
 
@@ -538,9 +541,13 @@ public final class MetadataBuilder<C> {
   }
 
   private void generateMetaForAttributeHolders() {
-    generateAttributeMetaForAnnotatedElements(new AnnotatedElement[] { originalClazz });
-    generateAttributeMetaForAnnotatedElements(originalClazz.getDeclaredFields());
-    generateAttributeMetaForAnnotatedElements(originalClazz.getDeclaredMethods());
+    generateAttributeMetaForAnnotatedElements(new AnnotatedElement[] { processedClazz });
+    generateAttributeMetaForAnnotatedElements(processedClazz.getDeclaredFields());
+    generateAttributeMetaForAnnotatedElements(processedClazz.getDeclaredMethods());
+  }
+
+  private <R> R getOldOrNewValue(final R oldValue, final R newValue) {
+    return newValue != null ? newValue : oldValue;
   }
 
   private String makeStringNullIfEmpty(final String text) {
@@ -572,7 +579,7 @@ public final class MetadataBuilder<C> {
     } catch (NoSuchMethodException | SecurityException | IllegalAccessException
         | IllegalArgumentException
         | InvocationTargetException e) {
-      throw new RuntimeException("Error during processing class " + originalClazz.getName(), e);
+      throw new RuntimeException("Error during processing class " + processedClazz.getName(), e);
     }
 
   }
@@ -698,13 +705,13 @@ public final class MetadataBuilder<C> {
     if (!exists) {
       throw new MetadataValidationException("Duplicate attribute id '"
           + attributeMetadata.getAttributeId()
-          + "' found in class '" + originalClazz.getName() + "'.");
+          + "' found in class '" + processedClazz.getName() + "'.");
     }
   }
 
   private String resolveIdIfMethodNameStartsWith(final String memberName, final String prefix) {
     int prefixLength = prefix.length();
-    if (memberName.startsWith(prefix) && memberName.length() > prefixLength) {
+    if (memberName.startsWith(prefix) && (memberName.length() > prefixLength)) {
       return memberName.substring(prefixLength, prefixLength + 1).toLowerCase(Locale.getDefault())
           + memberName.substring(prefixLength + 1);
     } else {
@@ -731,7 +738,7 @@ public final class MetadataBuilder<C> {
         throw new InconsistentAnnotationException(
             "Could not determine the multiplicity of attribute based on annotation '"
                 + annotation.toString() + "' that is defined on the method '" + member.toString()
-                + "' in the class " + originalClazz.getName());
+                + "' in the class " + processedClazz.getName());
       }
       return parameterTypes[0].isArray();
     } else if (member instanceof Field) {
@@ -780,7 +787,7 @@ public final class MetadataBuilder<C> {
 
     throw new MetadataValidationException(
         "Could not determine the OSGi service interface based on type "
-            + genericType + " in class " + originalClazz.getName());
+            + genericType + " in class " + processedClazz.getName());
 
   }
 
@@ -837,7 +844,7 @@ public final class MetadataBuilder<C> {
 
     }
 
-    Method method = MethodUtil.locateMethodByPreference(originalClazz, false,
+    Method method = MethodUtil.locateMethodByPreference(processedClazz, false,
         potentialDescriptors.toArray(new MethodDescriptor[potentialDescriptors.size()]));
 
     if (method == null) {

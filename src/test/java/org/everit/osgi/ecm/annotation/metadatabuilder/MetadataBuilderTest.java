@@ -17,6 +17,7 @@ package org.everit.osgi.ecm.annotation.metadatabuilder;
 
 import org.everit.osgi.ecm.metadata.AttributeMetadata;
 import org.everit.osgi.ecm.metadata.ComponentMetadata;
+import org.everit.osgi.ecm.util.method.MethodDescriptor;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -25,7 +26,7 @@ public class MetadataBuilderTest {
   @Test
   public void testAttributePriorityOrder() {
     ComponentMetadata buildComponentMetadata = MetadataBuilder
-        .buildComponentMetadata(TestComponent.class);
+        .buildComponentMetadata(TestPriorityComponent.class);
 
     AttributeMetadata<?>[] attributes = buildComponentMetadata.getAttributes();
     int i = 0;
@@ -46,5 +47,23 @@ public class MetadataBuilderTest {
     Assert.assertEquals("byteAttribute4", attributes[i++].getAttributeId());
     Assert.assertEquals("stringAttributeDefaultPriority", attributes[i++].getAttributeId());
     Assert.assertEquals("stringAttributeAfterDefaultPriority", attributes[i++].getAttributeId());
+  }
+
+  @Test
+  public void testValami() {
+    ComponentMetadata buildComponentMetadata = MetadataBuilder
+        .buildComponentMetadata(ChildTestComponent.class);
+
+    AttributeMetadata<?>[] attributes = buildComponentMetadata.getAttributes();
+    Assert.assertEquals(6, attributes.length);
+
+    MethodDescriptor activate = buildComponentMetadata.getActivate();
+    Assert.assertEquals("childActivate", activate.getMethodName());
+
+    MethodDescriptor update = buildComponentMetadata.getUpdate();
+    Assert.assertEquals("update", update.getMethodName());
+
+    MethodDescriptor deactivate = buildComponentMetadata.getDeactivate();
+    Assert.assertEquals("parentDeactivate", deactivate.getMethodName());
   }
 }
