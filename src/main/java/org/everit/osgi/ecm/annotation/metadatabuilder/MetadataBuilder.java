@@ -118,13 +118,6 @@ public final class MetadataBuilder<C> {
 
     @Override
     public int compare(final AttributeMetadata<?> attr1, final AttributeMetadata<?> attr2) {
-      if (attr1 == null) {
-        return -1;
-      }
-      if (attr2 == null) {
-        return 1;
-      }
-
       float attr1Priority = attr1.getPriority();
       float attr2Priority = attr2.getPriority();
       int compare = Float.compare(attr1Priority, attr2Priority);
@@ -324,7 +317,7 @@ public final class MetadataBuilder<C> {
       } else if (member instanceof Method) {
         Method method = ((Method) member);
         Class<?>[] parameterTypes = method.getParameterTypes();
-        if ((parameterTypes.length != 1) || parameterTypes[0].isPrimitive()) {
+        if (parameterTypes.length != 1 || parameterTypes[0].isPrimitive()) {
           throw new InconsistentAnnotationException(
               "Reference auto detection can work only on a method that has one"
                   + " non-primitive parameter:" + method.toGenericString());
@@ -363,7 +356,7 @@ public final class MetadataBuilder<C> {
     @SuppressWarnings("unchecked")
     V_ARRAY typedDefaultValueArray = (V_ARRAY) defaultValueArray;
 
-    if (!multiple && (Array.getLength(typedDefaultValueArray) == 0)) {
+    if (!multiple && Array.getLength(typedDefaultValueArray) == 0) {
       typedDefaultValueArray = null;
     }
 
@@ -385,7 +378,7 @@ public final class MetadataBuilder<C> {
     String attributeId = callMethodOfAnnotation(annotation, "attributeId");
     attributeId = makeStringNullIfEmpty(attributeId);
 
-    if ((attributeId == null) && (member != null)) {
+    if (attributeId == null && member != null) {
       String memberName = member.getName();
       if (member instanceof Field) {
         attributeId = memberName;
@@ -688,7 +681,7 @@ public final class MetadataBuilder<C> {
 
   private String resolveIdIfMethodNameStartsWith(final String memberName, final String prefix) {
     int prefixLength = prefix.length();
-    if (memberName.startsWith(prefix) && (memberName.length() > prefixLength)) {
+    if (memberName.startsWith(prefix) && memberName.length() > prefixLength) {
       return memberName.substring(prefixLength, prefixLength + 1).toLowerCase(Locale.getDefault())
           + memberName.substring(prefixLength + 1);
     } else {
