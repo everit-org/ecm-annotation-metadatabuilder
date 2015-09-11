@@ -36,6 +36,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.Stack;
 import java.util.TreeSet;
 
 import javax.annotation.Generated;
@@ -187,43 +188,57 @@ public final class MetadataBuilder<C> {
   private NavigableSet<AttributeMetadata<?>> attributes =
       new TreeSet<>(ATTRIBUTE_METADATA_COMPARATOR);
 
-  private Class<C> clazz;
+  private Class<C> originalClazz;
+
+  private Stack<Class<?>> superClasses = new Stack<>();;
 
   private MetadataBuilder() {
   }
 
   private MetadataBuilder(final Class<C> clazz) {
-    this.clazz = clazz;
+    this.originalClazz = clazz;
   }
 
   private ComponentMetadata build() {
-    Component componentAnnotation = clazz.getAnnotation(Component.class);
-    if (componentAnnotation == null) {
-      throw new ComponentAnnotationMissingException("Component annotation is missing on type "
-          + clazz.toString());
+    superClasses.push(originalClazz);
+
+    Class<?> superclass = originalClazz.getSuperclass();
+    while ((superclass != null)
+        && superclass.getTypeName().equals(Object.class.getTypeName())) {
+      superClasses.push(superclass);
+      superclass = superclass.getSuperclass();
     }
 
-    ComponentMetadataBuilder componentMetaBuilder = new ComponentMetadataBuilder()
-        .withComponentId(makeStringNullIfEmpty(componentAnnotation.componentId()))
-        .withConfigurationPid(makeStringNullIfEmpty(componentAnnotation.configurationPid()))
-        .withConfigurationPolicy(
-            convertConfigurationPolicy(componentAnnotation.configurationPolicy()))
-        .withDescription(makeStringNullIfEmpty(componentAnnotation.description()))
-        .withIcons(convertIcons(componentAnnotation.icons()))
-        .withMetatype(componentAnnotation.metatype())
-        .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
-        .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()))
-        .withType(clazz.getName())
-        .withActivate(findMethodWithAnnotation(Activate.class))
-        .withDeactivate(findMethodWithAnnotation(Deactivate.class))
-        .withUpdate(findMethodWithAnnotation(Update.class));
+    ComponentMetadataBuilder componentMetaBuilder = new ComponentMetadataBuilder();
+    Class<?> clazz = nextClass();
+    while ((clazz = nextClass()) != null) {
+      Component componentAnnotation = clazz.getAnnotation(Component.class);
+      if (componentAnnotation != null) {
+        componentMetaBuilder = componentMetaBuilder
+            .withComponentId(makeStringNullIfEmpty(componentAnnotation.componentId()))
+            .withConfigurationPid(makeStringNullIfEmpty(componentAnnotation.configurationPid()))
+            .withConfigurationPolicy(
+                convertConfigurationPolicy(componentAnnotation.configurationPolicy()))
+            .withDescription(makeStringNullIfEmpty(componentAnnotation.description()))
+            .withIcons(convertIcons(componentAnnotation.icons()))
+            .withMetatype(componentAnnotation.metatype())
+            .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
+            .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()))
+            .withType(clazz.getName());
+      } else {
+        componentMetaBuilder = componentMetaBuilder
+            .withActivate(findMethodWithAnnotation(clazz, Activate.class))
+            .withDeactivate(findMethodWithAnnotation(clazz, Deactivate.class))
+            .withUpdate(findMethodWithAnnotation(clazz, Update.class));
+      }
+    }
 
     generateMetaForAttributeHolders();
 
     componentMetaBuilder.withAttributes(attributes.toArray(
         new AttributeMetadata<?>[attributes.size()]));
 
-    Service serviceAnnotation = clazz.getAnnotation(Service.class);
+    Service serviceAnnotation = originalClazz.getAnnotation(Service.class);
 
     if (serviceAnnotation != null) {
       ServiceMetadataBuilder serviceMetadataBuilder = new ServiceMetadataBuilder();
@@ -435,7 +450,7 @@ public final class MetadataBuilder<C> {
     if (referenceId == null) {
       throw new MetadataValidationException(
           "Reference id for one of the references could not be determined in class "
-              + clazz.getName());
+              + originalClazz.getName());
     }
 
     String setterName =
@@ -488,7 +503,7 @@ public final class MetadataBuilder<C> {
     builder.withOptions(labels, values);
   }
 
-  private MethodDescriptor findMethodWithAnnotation(
+  private MethodDescriptor findMethodWithAnnotation(final Class<?> clazz,
       final Class<? extends Annotation> annotationClass) {
     Method foundMethod = null;
     Method[] methods = clazz.getDeclaredMethods();
@@ -497,7 +512,8 @@ public final class MetadataBuilder<C> {
       if (annotation != null) {
         if (foundMethod != null) {
           throw new InconsistentAnnotationException("The '" + annotationClass.getName()
-              + "' annotation is attached to more than one method in class '" + clazz.getName()
+              + "' annotation is attached to more than one method in class '"
+              + clazz.getName()
               + "'.");
         }
 
@@ -529,9 +545,9 @@ public final class MetadataBuilder<C> {
   }
 
   private void generateMetaForAttributeHolders() {
-    generateAttributeMetaForAnnotatedElements(new AnnotatedElement[] { clazz });
-    generateAttributeMetaForAnnotatedElements(clazz.getDeclaredFields());
-    generateAttributeMetaForAnnotatedElements(clazz.getDeclaredMethods());
+    generateAttributeMetaForAnnotatedElements(new AnnotatedElement[] { originalClazz });
+    generateAttributeMetaForAnnotatedElements(originalClazz.getDeclaredFields());
+    generateAttributeMetaForAnnotatedElements(originalClazz.getDeclaredMethods());
   }
 
   private String makeStringNullIfEmpty(final String text) {
@@ -545,6 +561,13 @@ public final class MetadataBuilder<C> {
     return text;
   }
 
+  private Class<?> nextClass() {
+    if (superClasses.isEmpty()) {
+      return null;
+    }
+    return superClasses.pop();
+  }
+
   private void processAnnotationContainer(final Annotation annotationContainer) {
 
     try {
@@ -556,7 +579,7 @@ public final class MetadataBuilder<C> {
     } catch (NoSuchMethodException | SecurityException | IllegalAccessException
         | IllegalArgumentException
         | InvocationTargetException e) {
-      throw new RuntimeException("Error during processing class " + clazz.getName(), e);
+      throw new RuntimeException("Error during processing class " + originalClazz.getName(), e);
     }
 
   }
@@ -682,7 +705,7 @@ public final class MetadataBuilder<C> {
     if (!exists) {
       throw new MetadataValidationException("Duplicate attribute id '"
           + attributeMetadata.getAttributeId()
-          + "' found in class '" + clazz.getName() + "'.");
+          + "' found in class '" + originalClazz.getName() + "'.");
     }
   }
 
@@ -715,7 +738,7 @@ public final class MetadataBuilder<C> {
         throw new InconsistentAnnotationException(
             "Could not determine the multiplicity of attribute based on annotation '"
                 + annotation.toString() + "' that is defined on the method '" + member.toString()
-                + "' in the class " + clazz.getName());
+                + "' in the class " + originalClazz.getName());
       }
       return parameterTypes[0].isArray();
     } else if (member instanceof Field) {
@@ -724,7 +747,7 @@ public final class MetadataBuilder<C> {
     }
     throw new InconsistentAnnotationException(
         "Could not determine the multiplicity of attribute based on annotation '"
-            + annotation.toString() + "' in the class " + clazz.getName());
+            + annotation.toString() + "' in the class " + originalClazz.getName());
   }
 
   private Class<?> resolveServiceInterfaceBasedOnClassType(final Class<?> classType) {
@@ -764,7 +787,7 @@ public final class MetadataBuilder<C> {
 
     throw new MetadataValidationException(
         "Could not determine the OSGi service interface based on type "
-            + genericType + " in class " + clazz.getName());
+            + genericType + " in class " + originalClazz.getName());
 
   }
 
@@ -796,7 +819,7 @@ public final class MetadataBuilder<C> {
     }
     throw new MetadataValidationException(
         "Could not determine the OSGi service interface based on type "
-            + parameterizedType + " in class " + clazz.getName());
+            + parameterizedType + " in class " + originalClazz.getName());
   }
 
   private <V, B extends PropertyAttributeMetadataBuilder<V, B>> MethodDescriptor resolveSetter(
@@ -821,7 +844,7 @@ public final class MetadataBuilder<C> {
 
     }
 
-    Method method = MethodUtil.locateMethodByPreference(clazz, false,
+    Method method = MethodUtil.locateMethodByPreference(originalClazz, false,
         potentialDescriptors.toArray(new MethodDescriptor[potentialDescriptors.size()]));
 
     if (method == null) {
