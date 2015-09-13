@@ -25,10 +25,14 @@ import org.everit.osgi.ecm.annotation.attribute.BooleanAttribute;
 import org.everit.osgi.ecm.annotation.attribute.ByteAttribute;
 import org.everit.osgi.ecm.annotation.attribute.FloatAttribute;
 import org.everit.osgi.ecm.annotation.attribute.StringAttribute;
+import org.everit.osgi.ecm.annotation.attribute.StringAttributes;
 
 /**
  * Component to test initialization via attributes priority.
  */
+@StringAttributes({
+    @StringAttribute(attributeId = "classStringAttribute", defaultValue = "parent", priority = -1)
+})
 public class ParentTestComponent implements Function<String, String> {
 
   private Map<String, String> mapService;

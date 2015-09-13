@@ -17,6 +17,7 @@ package org.everit.osgi.ecm.annotation.metadatabuilder;
 
 import org.everit.osgi.ecm.metadata.AttributeMetadata;
 import org.everit.osgi.ecm.metadata.ComponentMetadata;
+import org.everit.osgi.ecm.metadata.MetadataValidationException;
 import org.everit.osgi.ecm.util.method.MethodDescriptor;
 import org.junit.Assert;
 import org.junit.Test;
@@ -29,16 +30,32 @@ public class MetadataBuilderTest {
         .buildComponentMetadata(ChildTestComponent.class);
 
     AttributeMetadata<?>[] attributes = buildComponentMetadata.getAttributes();
-    Assert.assertEquals(8, attributes.length);
+    Assert.assertEquals(9, attributes.length);
     int i = 0;
+    // redefined in ChildTestComponent
+    Assert.assertEquals("classStringAttribute", attributes[i].getAttributeId());
+    Assert.assertEquals(0, attributes[i].getPriority(), 0);
+    Assert.assertEquals("child", ((String[]) attributes[i++].getDefaultValue())[0]);
+
     Assert.assertEquals("childByteAttribute", attributes[i++].getAttributeId());
+
     Assert.assertEquals("parentByteAttribute", attributes[i++].getAttributeId());
+
     Assert.assertEquals("parentBooleanAttribute", attributes[i++].getAttributeId());
+
     Assert.assertEquals("childStringAttribute", attributes[i++].getAttributeId());
+
     Assert.assertEquals("listService.target", attributes[i++].getAttributeId());
+
     Assert.assertEquals("mapService.target", attributes[i++].getAttributeId());
-    Assert.assertEquals("parentFloatAttribute", attributes[i++].getAttributeId());
-    Assert.assertEquals("parentStringAttribute", attributes[i++].getAttributeId());
+
+    // redefined in ChildTestComponent
+    Assert.assertEquals("parentFloatAttribute", attributes[i].getAttributeId());
+    Assert.assertEquals(null, attributes[i++].getDefaultValue());
+
+    // redefined in ChildTestComponent
+    Assert.assertEquals("parentStringAttribute", attributes[i].getAttributeId());
+    Assert.assertEquals(null, attributes[i++].getDefaultValue());
 
     MethodDescriptor activate = buildComponentMetadata.getActivate();
     Assert.assertEquals("childActivate", activate.getMethodName());
@@ -74,5 +91,20 @@ public class MetadataBuilderTest {
     Assert.assertEquals("byteAttribute4", attributes[i++].getAttributeId());
     Assert.assertEquals("stringAttributeDefaultPriority", attributes[i++].getAttributeId());
     Assert.assertEquals("stringAttributeAfterDefaultPriority", attributes[i++].getAttributeId());
+  }
+
+  @Test
+  public void testWrongAttributeInheritance() {
+    try {
+      MetadataBuilder.buildComponentMetadata(WrongChildTestComponent.class);
+      Assert.fail("Expect MetadataValidationException. The overrided 'classStringAttribute' "
+          + "attribute type is wrong.");
+    } catch (MetadataValidationException e) {
+      Assert.assertNotNull(e);
+      Assert.assertEquals("Overrided attribute id 'classStringAttribute' attribute type is wrong. "
+          + "Parent attribute type 'class org.everit.osgi.ecm.metadata.StringAttributeMetadata', "
+          + "child attribute type 'class org.everit.osgi.ecm.metadata.BooleanAttributeMetadata'.",
+          e.getMessage());
+    }
   }
 }

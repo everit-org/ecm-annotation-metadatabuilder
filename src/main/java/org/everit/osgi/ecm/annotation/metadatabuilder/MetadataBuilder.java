@@ -186,7 +186,7 @@ public final class MetadataBuilder<C> {
 
   private Class<?> processedClazz;
 
-  private Stack<Class<?>> superClasses = new Stack<>();
+  private Stack<Class<?>> superClazzes = new Stack<>();
 
   private MetadataBuilder() {
   }
@@ -221,11 +221,11 @@ public final class MetadataBuilder<C> {
       componentMetaBuilder.withService(serviceMetadataBuilder.build());
     }
 
-    superClasses.push(originalClazz);
+    superClazzes.push(originalClazz);
     Class<?> superclass = originalClazz.getSuperclass();
     while ((superclass != null)
         && !superclass.getTypeName().equals(Object.class.getTypeName())) {
-      superClasses.push(superclass);
+      superClazzes.push(superclass);
       superclass = superclass.getSuperclass();
     }
 
@@ -565,10 +565,10 @@ public final class MetadataBuilder<C> {
   }
 
   private Class<?> nextClass() {
-    if (superClasses.isEmpty()) {
+    if (superClazzes.isEmpty()) {
       return null;
     }
-    return superClasses.pop();
+    return superClazzes.pop();
   }
 
   private void processAnnotationContainer(final Annotation annotationContainer) {
@@ -706,13 +706,21 @@ public final class MetadataBuilder<C> {
     String attributeId = attributeMetadata.getAttributeId();
 
     AttributeMetadata<?> oldAttributeMetadata = attributes.get(attributeId);
-    if ((oldAttributeMetadata != null)
-        && attributeClasses.get(attributeId).equals(processedClazz)) {
-      throw new MetadataValidationException("Duplicate attribute id '"
-          + builder.getAttributeId()
-          + "' found in class '" + processedClazz.getName() + "'.");
+    if ((oldAttributeMetadata != null)) {
+      if (attributeClasses.get(attributeId).equals(processedClazz)) {
+        throw new MetadataValidationException("Duplicate attribute id '"
+            + attributeMetadata.getAttributeId()
+            + "' found in class '" + processedClazz.getName() + "'.");
+      }
+
+      if (!oldAttributeMetadata.getClass().equals(attributeMetadata.getClass())) {
+        throw new MetadataValidationException("Overrided attribute id '"
+            + attributeMetadata.getAttributeId()
+            + "' attribute type is wrong. Parent attribute type '"
+            + oldAttributeMetadata.getClass() + "', child attribute type '"
+            + attributeMetadata.getClass() + "'.");
+      }
     }
-    // TODO check attributeMetadata type??
 
     attributes.put(attributeId, attributeMetadata);
     attributeClasses.put(attributeId, processedClazz);

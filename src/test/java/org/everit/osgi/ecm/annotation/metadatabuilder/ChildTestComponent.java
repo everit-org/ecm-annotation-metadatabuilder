@@ -36,7 +36,8 @@ import org.everit.osgi.ecm.annotation.attribute.StringAttributes;
     @BooleanAttribute(attributeId = "childByteAttribute", priority = 8),
 })
 @StringAttributes({
-    @StringAttribute(attributeId = "parentStringAttribute")
+    @StringAttribute(attributeId = "parentStringAttribute"),
+    @StringAttribute(attributeId = "classStringAttribute", defaultValue = "child", priority = 0)
 })
 @ServiceRefs({
     @ServiceRef(referenceId = "listService", setter = "setListService")
@@ -78,7 +79,6 @@ public class ChildTestComponent extends ParentTestComponent implements Supplier<
   @FloatAttribute
   @Override
   public void setParentFloatAttribute(final float parentFloatAttribute) {
-    // TODO Auto-generated method stub
     super.setParentFloatAttribute(parentFloatAttribute);
   }
 
