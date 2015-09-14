@@ -39,7 +39,7 @@ import org.everit.osgi.ecm.annotation.attribute.StringAttribute;
     @BooleanAttribute(attributeId = "byteAttribute4")
 })
 @Service
-public class TestComponent {
+public class TestPriorityComponent {
 
   private boolean booleanAttribute;
 
