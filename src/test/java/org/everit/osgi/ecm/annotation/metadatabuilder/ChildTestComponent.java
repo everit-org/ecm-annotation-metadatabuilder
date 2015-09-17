@@ -16,7 +16,6 @@
 package org.everit.osgi.ecm.annotation.metadatabuilder;
 
 import java.util.List;
-import java.util.function.Supplier;
 
 import org.everit.osgi.ecm.annotation.Activate;
 import org.everit.osgi.ecm.annotation.Component;

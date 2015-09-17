@@ -16,7 +16,6 @@
 package org.everit.osgi.ecm.annotation.metadatabuilder;
 
 import java.util.Map;
-import java.util.function.Function;
 
 import org.everit.osgi.ecm.annotation.Activate;
 import org.everit.osgi.ecm.annotation.Deactivate;
