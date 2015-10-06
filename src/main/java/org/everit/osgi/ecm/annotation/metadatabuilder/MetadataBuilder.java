@@ -47,6 +47,7 @@ import org.everit.osgi.ecm.annotation.BundleCapabilityRef;
 import org.everit.osgi.ecm.annotation.BundleCapabilityRefs;
 import org.everit.osgi.ecm.annotation.Component;
 import org.everit.osgi.ecm.annotation.Deactivate;
+import org.everit.osgi.ecm.annotation.ManualService;
 import org.everit.osgi.ecm.annotation.Service;
 import org.everit.osgi.ecm.annotation.ServiceRef;
 import org.everit.osgi.ecm.annotation.ServiceRefs;
@@ -178,15 +179,15 @@ public final class MetadataBuilder<C> {
     return metadataBuilder.build();
   }
 
-  private Map<String, Class<?>> attributeClasses = new HashMap<>();
+  private final Map<String, Class<?>> attributeClasses = new HashMap<>();
 
-  private Map<String, AttributeMetadata<?>> attributes = new HashMap<>();
+  private final Map<String, AttributeMetadata<?>> attributes = new HashMap<>();
 
   private Class<C> originalClazz;
 
   private Class<?> processedClazz;
 
-  private Stack<Class<?>> superClazzes = new Stack<>();
+  private final Stack<Class<?>> superClazzes = new Stack<>();
 
   private MetadataBuilder() {
   }
@@ -213,13 +214,8 @@ public final class MetadataBuilder<C> {
         .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
         .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()));
 
-    Service serviceAnnotation = originalClazz.getAnnotation(Service.class);
-    if (serviceAnnotation != null) {
-      ServiceMetadataBuilder serviceMetadataBuilder = new ServiceMetadataBuilder();
-      Class<?>[] serviceInterfaces = serviceAnnotation.value();
-      serviceMetadataBuilder.withClazzes(serviceInterfaces);
-      componentMetaBuilder.withService(serviceMetadataBuilder.build());
-    }
+    processServiceAnnotation(componentMetaBuilder);
+    processManualServiceAnnotation(componentMetaBuilder);
 
     superClazzes.push(originalClazz);
     Class<?> superclass = originalClazz.getSuperclass();
@@ -439,10 +435,11 @@ public final class MetadataBuilder<C> {
     fillAttributeMetaBuilder(member, annotation, builder);
 
     org.everit.osgi.ecm.annotation.ReferenceConfigurationType configurationType =
-        callMethodOfAnnotation(annotation, "configurationType");
+        callMethodOfAnnotation(
+            annotation, "configurationType");
 
-    ReferenceConfigurationType convertedConfigurationType =
-        convertReferenceConfigurationType(configurationType);
+    ReferenceConfigurationType convertedConfigurationType = convertReferenceConfigurationType(
+        configurationType);
 
     String referenceId = deriveReferenceId(member, annotation);
 
@@ -452,8 +449,8 @@ public final class MetadataBuilder<C> {
               + processedClazz.getName());
     }
 
-    String setterName =
-        makeStringNullIfEmpty((String) callMethodOfAnnotation(annotation, "setter"));
+    String setterName = makeStringNullIfEmpty(
+        (String) callMethodOfAnnotation(annotation, "setter"));
 
     if (setterName != null) {
       builder.withSetter(new MethodDescriptor(setterName));
@@ -674,11 +671,31 @@ public final class MetadataBuilder<C> {
     putIntoOrUpdateAttributes(builder);
   }
 
+  private void processManualServiceAnnotation(final ComponentMetadataBuilder componentMetaBuilder) {
+    ManualService annotation = originalClazz.getAnnotation(ManualService.class);
+    if (annotation != null) {
+      ServiceMetadataBuilder serviceMetadataBuilder = new ServiceMetadataBuilder();
+      Class<?>[] serviceInterfaces = annotation.value();
+      serviceMetadataBuilder.withClazzes(serviceInterfaces);
+      componentMetaBuilder.withManualService(serviceMetadataBuilder.build());
+    }
+  }
+
   private void processPasswordAttributeAnnotation(final Member element,
       final Annotation annotation) {
     PasswordAttributeMetadataBuilder builder = new PasswordAttributeMetadataBuilder();
     fillPropertyAttributeBuilder(element, annotation, builder);
     putIntoOrUpdateAttributes(builder);
+  }
+
+  private void processServiceAnnotation(final ComponentMetadataBuilder componentMetaBuilder) {
+    Service serviceAnnotation = originalClazz.getAnnotation(Service.class);
+    if (serviceAnnotation != null) {
+      ServiceMetadataBuilder serviceMetadataBuilder = new ServiceMetadataBuilder();
+      Class<?>[] serviceInterfaces = serviceAnnotation.value();
+      serviceMetadataBuilder.withClazzes(serviceInterfaces);
+      componentMetaBuilder.withService(serviceMetadataBuilder.build());
+    }
   }
 
   private void processServiceReferenceAnnotation(final Member member, final ServiceRef annotation) {
