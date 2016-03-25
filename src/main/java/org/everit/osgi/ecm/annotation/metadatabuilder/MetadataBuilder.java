@@ -48,6 +48,7 @@ import org.everit.osgi.ecm.annotation.BundleCapabilityRefs;
 import org.everit.osgi.ecm.annotation.Component;
 import org.everit.osgi.ecm.annotation.Deactivate;
 import org.everit.osgi.ecm.annotation.ManualService;
+import org.everit.osgi.ecm.annotation.ManualServices;
 import org.everit.osgi.ecm.annotation.Service;
 import org.everit.osgi.ecm.annotation.ServiceRef;
 import org.everit.osgi.ecm.annotation.ServiceRefs;
@@ -94,6 +95,7 @@ import org.everit.osgi.ecm.metadata.PropertyAttributeMetadata.PropertyAttributeM
 import org.everit.osgi.ecm.metadata.ReferenceConfigurationType;
 import org.everit.osgi.ecm.metadata.ReferenceMetadata.ReferenceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.SelectablePropertyAttributeMetadata.SelectablePropertyAttributeMetadataBuilder;
+import org.everit.osgi.ecm.metadata.ServiceMetadata;
 import org.everit.osgi.ecm.metadata.ServiceMetadata.ServiceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ServiceReferenceMetadata.ServiceReferenceMetadataBuilder;
 import org.everit.osgi.ecm.metadata.ShortAttributeMetadata.ShortAttributeMetadataBuilder;
@@ -215,7 +217,7 @@ public final class MetadataBuilder<C> {
         .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()));
 
     processServiceAnnotation(componentMetaBuilder);
-    processManualServiceAnnotation(componentMetaBuilder);
+    processManualServicesAnnotation(componentMetaBuilder);
 
     superClazzes.push(originalClazz);
     Class<?> superclass = originalClazz.getSuperclass();
@@ -261,6 +263,14 @@ public final class MetadataBuilder<C> {
       throw new RuntimeException(e);
     }
 
+  }
+
+  private String[] convertClassArrayToClassNameArray(final Class<?>[] clazzes) {
+    String[] result = new String[clazzes.length];
+    for (int i = 0; i < clazzes.length; i++) {
+      result[i] = clazzes[i].getName();
+    }
+    return result;
   }
 
   private ConfigurationPolicy convertConfigurationPolicy(
@@ -671,13 +681,18 @@ public final class MetadataBuilder<C> {
     putIntoOrUpdateAttributes(builder);
   }
 
-  private void processManualServiceAnnotation(final ComponentMetadataBuilder componentMetaBuilder) {
-    ManualService annotation = originalClazz.getAnnotation(ManualService.class);
+  private void processManualServicesAnnotation(
+      final ComponentMetadataBuilder componentMetaBuilder) {
+    ManualServices annotation = originalClazz.getAnnotation(ManualServices.class);
     if (annotation != null) {
-      ServiceMetadataBuilder serviceMetadataBuilder = new ServiceMetadataBuilder();
-      Class<?>[] serviceInterfaces = annotation.value();
-      serviceMetadataBuilder.withClazzes(serviceInterfaces);
-      componentMetaBuilder.withManualService(serviceMetadataBuilder.build());
+      ManualService[] value = annotation.value();
+      ServiceMetadata[] serviceMetadataArray = new ServiceMetadata[value.length];
+      for (int i = 0; i < value.length; i++) {
+        ManualService manualService = value[i];
+        serviceMetadataArray[i] = new ServiceMetadataBuilder()
+            .withClazzes(convertClassArrayToClassNameArray(manualService.value())).build();
+      }
+      componentMetaBuilder.withManualServices(serviceMetadataArray);
     }
   }
 
@@ -693,7 +708,7 @@ public final class MetadataBuilder<C> {
     if (serviceAnnotation != null) {
       ServiceMetadataBuilder serviceMetadataBuilder = new ServiceMetadataBuilder();
       Class<?>[] serviceInterfaces = serviceAnnotation.value();
-      serviceMetadataBuilder.withClazzes(serviceInterfaces);
+      serviceMetadataBuilder.withClazzes(convertClassArrayToClassNameArray(serviceInterfaces));
       componentMetaBuilder.withService(serviceMetadataBuilder.build());
     }
   }
