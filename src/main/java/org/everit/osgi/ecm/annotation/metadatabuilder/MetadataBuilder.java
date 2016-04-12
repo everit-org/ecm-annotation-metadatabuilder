@@ -181,6 +181,10 @@ public final class MetadataBuilder<C> {
     return metadataBuilder.build();
   }
 
+  private static String getClassNameOrNull(final Class<?> clazz) {
+    return (clazz != null) ? clazz.getName() : null;
+  }
+
   private final Map<String, Class<?>> attributeClasses = new HashMap<>();
 
   private final Map<String, AttributeMetadata<?>> attributes = new HashMap<>();
@@ -716,7 +720,7 @@ public final class MetadataBuilder<C> {
   private void processServiceReferenceAnnotation(final Member member, final ServiceRef annotation) {
     ServiceReferenceMetadataBuilder builder = new ServiceReferenceMetadataBuilder();
     fillReferenceBuilder(member, annotation, builder);
-    builder.withServiceInterface(deriveServiceInterface(member, annotation));
+    builder.withServiceInterface(getClassNameOrNull(deriveServiceInterface(member, annotation)));
     putIntoOrUpdateAttributes(builder);
   }
 
