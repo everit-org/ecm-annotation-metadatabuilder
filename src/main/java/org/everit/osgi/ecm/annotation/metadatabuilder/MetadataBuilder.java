@@ -102,6 +102,7 @@ import org.everit.osgi.ecm.metadata.ShortAttributeMetadata.ShortAttributeMetadat
 import org.everit.osgi.ecm.metadata.StringAttributeMetadata.StringAttributeMetadataBuilder;
 import org.everit.osgi.ecm.util.method.MethodDescriptor;
 import org.everit.osgi.ecm.util.method.MethodUtil;
+import org.osgi.framework.Version;
 
 /**
  * Programmers can use the {@link MetadataBuilder} to generate component metadata from annotated
@@ -218,7 +219,8 @@ public final class MetadataBuilder<C> {
         .withIcons(convertIcons(componentAnnotation.icons()))
         .withMetatype(componentAnnotation.metatype())
         .withLabel(makeStringNullIfEmpty(componentAnnotation.label()))
-        .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()));
+        .withLocalizationBase(makeStringNullIfEmpty(componentAnnotation.localizationBase()))
+        .withVersion(resolveVersion(componentAnnotation));
 
     processServiceAnnotation(componentMetaBuilder);
     processManualServicesAnnotation(componentMetaBuilder);
@@ -903,5 +905,13 @@ public final class MetadataBuilder<C> {
       return null;
     }
     return new MethodDescriptor(method);
+  }
+
+  private Version resolveVersion(final Component componentAnnotation) {
+    String versionString = componentAnnotation.version();
+    if ("".equals(versionString)) {
+      return null;
+    }
+    return new Version(versionString);
   }
 }
