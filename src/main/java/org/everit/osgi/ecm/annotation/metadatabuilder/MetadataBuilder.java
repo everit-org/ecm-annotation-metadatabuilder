@@ -182,6 +182,25 @@ public final class MetadataBuilder<C> {
     return metadataBuilder.build();
   }
 
+  /**
+   * Generates ECM Component Metadata from an annotated class. This method is introduced as
+   * technologies with bytecode weaving might change the result of {@link Class#getName()} that
+   * causes issues during automatic OSGi service registration based on the name of the type.
+   *
+   * @param className
+   *          The name of the class that is annotated.
+   * @param classLoader
+   *          The classLoader that can load the class specified with className.
+   *
+   * @return The generated Metadata that can be used to set up an ECM Component Container.
+   * @since 3.1.0
+   */
+  public static ComponentMetadata buildComponentMetadata(String className,
+      final ClassLoader classLoader) {
+    MetadataBuilder<?> metadataBuilder = new MetadataBuilder<>(className, classLoader);
+    return metadataBuilder.build();
+  }
+
   private static String getClassNameOrNull(final Class<?> clazz) {
     return (clazz != null) ? clazz.getName() : null;
   }
@@ -190,17 +209,28 @@ public final class MetadataBuilder<C> {
 
   private final Map<String, AttributeMetadata<?>> attributes = new HashMap<>();
 
-  private Class<C> originalClazz;
+  private final String originalClassName;
+
+  private final Class<C> originalClazz;
 
   private Class<?> processedClazz;
 
   private final Stack<Class<?>> superClazzes = new Stack<>();
 
-  private MetadataBuilder() {
-  }
-
   private MetadataBuilder(final Class<C> clazz) {
     this.originalClazz = clazz;
+    this.originalClassName = clazz.getName();
+  }
+
+  private MetadataBuilder(final String className, ClassLoader classLoader) {
+    this.originalClassName = className;
+    try {
+      @SuppressWarnings("unchecked")
+      Class<C> clazz = (Class<C>) classLoader.loadClass(className);
+      this.originalClazz = clazz;
+    } catch (ClassNotFoundException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private ComponentMetadata build() {
@@ -210,7 +240,7 @@ public final class MetadataBuilder<C> {
           + originalClazz.toString());
     }
     ComponentMetadataBuilder componentMetaBuilder = new ComponentMetadataBuilder()
-        .withType(originalClazz.getName())
+        .withType(originalClassName)
         .withComponentId(makeStringNullIfEmpty(componentAnnotation.componentId()))
         .withConfigurationPid(makeStringNullIfEmpty(componentAnnotation.configurationPid()))
         .withConfigurationPolicy(
