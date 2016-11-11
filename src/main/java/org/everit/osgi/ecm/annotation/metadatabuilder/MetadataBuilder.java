@@ -144,7 +144,7 @@ public final class MetadataBuilder<C> {
   private static final Map<Class<?>, Class<?>> PRIMITIVE_BOXING_TYPE_MAPPING;
 
   static {
-    ANNOTATION_CONTAINER_TYPES = new HashSet<Class<?>>();
+    ANNOTATION_CONTAINER_TYPES = new HashSet<>();
     ANNOTATION_CONTAINER_TYPES.add(ServiceRefs.class);
     ANNOTATION_CONTAINER_TYPES.add(BundleCapabilityRefs.class);
     ANNOTATION_CONTAINER_TYPES.add(BooleanAttributes.class);
@@ -178,7 +178,7 @@ public final class MetadataBuilder<C> {
    * @return The generated Metadata that can be used to set up an ECM Component Container.
    */
   public static <C> ComponentMetadata buildComponentMetadata(final Class<C> clazz) {
-    MetadataBuilder<C> metadataBuilder = new MetadataBuilder<C>(clazz);
+    MetadataBuilder<C> metadataBuilder = new MetadataBuilder<>(clazz);
     return metadataBuilder.build();
   }
 
@@ -195,7 +195,7 @@ public final class MetadataBuilder<C> {
    * @return The generated Metadata that can be used to set up an ECM Component Container.
    * @since 3.1.0
    */
-  public static ComponentMetadata buildComponentMetadata(String className,
+  public static ComponentMetadata buildComponentMetadata(final String className,
       final ClassLoader classLoader) {
     MetadataBuilder<?> metadataBuilder = new MetadataBuilder<>(className, classLoader);
     return metadataBuilder.build();
@@ -222,7 +222,7 @@ public final class MetadataBuilder<C> {
     this.originalClassName = clazz.getName();
   }
 
-  private MetadataBuilder(final String className, ClassLoader classLoader) {
+  private MetadataBuilder(final String className, final ClassLoader classLoader) {
     this.originalClassName = className;
     try {
       @SuppressWarnings("unchecked")
@@ -909,7 +909,7 @@ public final class MetadataBuilder<C> {
   private <V, B extends PropertyAttributeMetadataBuilder<V, B>> MethodDescriptor resolveSetter(
       final PropertyAttributeMetadataBuilder<V, B> builder, final String setterName) {
 
-    List<MethodDescriptor> potentialDescriptors = new ArrayList<MethodDescriptor>();
+    List<MethodDescriptor> potentialDescriptors = new ArrayList<>();
     Class<?> attributeType = builder.getValueType();
     boolean multiple = builder.isMultiple();
 
