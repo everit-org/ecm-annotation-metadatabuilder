@@ -28,7 +28,7 @@
 
   <groupId>org.everit.osgi</groupId>
   <artifactId>org.everit.osgi.ecm.annotation.metadatabuilder</artifactId>
-  <version>3.1.0</version>
+  <version>3.1.1-SNAPSHOT</version>
 
   <packaging>bundle</packaging>
 
