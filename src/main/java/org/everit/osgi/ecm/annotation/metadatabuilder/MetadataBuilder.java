@@ -264,15 +264,20 @@ public final class MetadataBuilder<C> {
     }
 
     while ((processedClazz = nextClass()) != null) {
-      MethodDescriptor activateMethod = findMethodWithAnnotation(Activate.class);
-      MethodDescriptor deactivateMethod = findMethodWithAnnotation(Deactivate.class);
-      MethodDescriptor updateMethod = findMethodWithAnnotation(Update.class);
-      componentMetaBuilder = componentMetaBuilder
-          .withActivate(getOldOrNewValue(componentMetaBuilder.getActivate(), activateMethod))
-          .withDeactivate(getOldOrNewValue(componentMetaBuilder.getDeactivate(), deactivateMethod))
-          .withUpdate(getOldOrNewValue(componentMetaBuilder.getUpdate(), updateMethod));
+      try {
+        MethodDescriptor activateMethod = findMethodWithAnnotation(Activate.class);
+        MethodDescriptor deactivateMethod = findMethodWithAnnotation(Deactivate.class);
+        MethodDescriptor updateMethod = findMethodWithAnnotation(Update.class);
+        componentMetaBuilder = componentMetaBuilder
+            .withActivate(getOldOrNewValue(componentMetaBuilder.getActivate(), activateMethod))
+            .withDeactivate(
+                getOldOrNewValue(componentMetaBuilder.getDeactivate(), deactivateMethod))
+            .withUpdate(getOldOrNewValue(componentMetaBuilder.getUpdate(), updateMethod));
 
-      generateMetaForAttributeHolders();
+        generateMetaForAttributeHolders();
+      } catch (NoClassDefFoundError e) {
+        throw new RuntimeException("Error during processing class: " + processedClazz, e);
+      }
     }
 
     NavigableSet<AttributeMetadata<?>> attributes = new TreeSet<>(ATTRIBUTE_METADATA_COMPARATOR);
